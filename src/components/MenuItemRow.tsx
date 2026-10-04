@@ -8,7 +8,7 @@ export function MenuItemRow({ kitchenId, kitchenName, item }: { kitchenId: strin
   const { cart, addItem, setQuantity } = useCart();
   const [showDetail, setShowDetail] = useState(false);
   const quantity = cart?.kitchenId === kitchenId ? cart.items.find((i) => i.menuItemId === item.id)?.quantity ?? 0 : 0;
-  const add = () => addItem(kitchenId, kitchenName, { menuItemId: item.id, name: item.name, price: item.price });
+  const add = () => addItem(kitchenId, kitchenName, { menuItemId: item.id, name: item.name, price: item.price, photoUrl: item.photo_url });
   return <>
     <article className="kb-menu-row">
       <button type="button" onClick={() => setShowDetail(true)} className="flex min-w-0 flex-1 items-center gap-3 text-left">

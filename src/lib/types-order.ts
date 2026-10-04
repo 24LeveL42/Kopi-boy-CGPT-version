@@ -11,6 +11,8 @@ export interface CartItem {
   menuItemId: string;
   name: string;
   price: number; // SGD, snapshotted from the menu item when added
+  /** Original menu photo, carried into the cart so the cart can show the real food image. */
+  photoUrl?: string | null;
   quantity: number;
 }
 

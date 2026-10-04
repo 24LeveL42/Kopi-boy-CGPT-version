@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { useCart } from "@/lib/cart-context";
 import { placeOrder } from "@/lib/order-actions";
 import { useCustomerLocation } from "@/lib/use-customer-location";
@@ -20,7 +21,27 @@ export function CartView({ isSignedIn }: { isSignedIn: boolean }) {
  return <div className="kb-app-shell min-h-screen pb-32"><main className="mx-auto max-w-md px-4 py-5 sm:px-6">
   {!checkout?<>
    <div className="kb-checkout-title"><div><p className="kb-eyebrow">YOUR BAG</p><h1>Your Cart</h1><p>{cart.kitchenName}</p></div><button onClick={()=>{if(window.confirm("Remove everything from your cart?"))clearCart()}} className="kb-text-button">Clear All</button></div>
-   <section className="kb-cart-card mt-5"><div className="flex items-center justify-between border-b border-slate-100 pb-3"><div><p className="text-xs font-bold uppercase tracking-[.14em] text-purple-600">Your order</p><p className="mt-1 text-sm font-bold text-slate-900">{cart.items.reduce((s,i)=>s+i.quantity,0)} items from {cart.kitchenName}</p></div><span className="kb-mini-pill">Direct to cook</span></div><div className="divide-y divide-slate-100">{cart.items.map(item=><div key={item.menuItemId} className="flex items-center gap-3 py-4"><div className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-purple-100 to-emerald-100 text-2xl">🍽️</div><div className="min-w-0 flex-1"><p className="truncate text-sm font-extrabold text-slate-900">{item.name}</p><p className="mt-0.5 text-xs text-slate-500">${item.price.toFixed(2)}</p></div><div className="kb-quantity"><button aria-label={`Decrease ${item.name} quantity`} onClick={()=>setQuantity(item.menuItemId,item.quantity-1)}>−</button><b>{item.quantity}</b><button aria-label={`Increase ${item.name} quantity`} onClick={()=>setQuantity(item.menuItemId,item.quantity+1)}>+</button></div><button aria-label={`Remove ${item.name} from cart`} onClick={()=>removeItem(item.menuItemId)} className="text-lg text-slate-300 hover:text-red-500">⌫</button></div>)}</div></section>
+   <section className="kb-cart-card mt-5"><div className="flex items-center justify-between border-b border-slate-100 pb-3"><div><p className="text-xs font-bold uppercase tracking-[.14em] text-purple-600">Your order</p><p className="mt-1 text-sm font-bold text-slate-900">{cart.items.reduce((s,i)=>s+i.quantity,0)} items from {cart.kitchenName}</p></div><span className="kb-mini-pill">Direct to cook</span></div><div className="divide-y divide-slate-100">{cart.items.map(item=><div key={item.menuItemId} className="flex items-center gap-3 py-4"><div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-[#f0e9ff] via-white to-[#e4f7ef] ring-1 ring-black/5">
+              {item.photoUrl ? (
+                <Image
+                  src={item.photoUrl}
+                  alt=""
+                  fill
+                  sizes="64px"
+                  className="object-cover"
+                />
+              ) : (
+                <div className="grid h-full place-items-center">
+                  <Image
+                    src="/brand/logo-icon.png"
+                    alt="Kopi Boy"
+                    width={34}
+                    height={34}
+                    className="object-contain opacity-80"
+                  />
+                </div>
+              )}
+            </div><div className="min-w-0 flex-1"><p className="truncate text-sm font-extrabold text-slate-900">{item.name}</p><p className="mt-0.5 text-xs text-slate-500">${item.price.toFixed(2)}</p></div><div className="kb-quantity"><button aria-label={`Decrease ${item.name} quantity`} onClick={()=>setQuantity(item.menuItemId,item.quantity-1)}>−</button><b>{item.quantity}</b><button aria-label={`Increase ${item.name} quantity`} onClick={()=>setQuantity(item.menuItemId,item.quantity+1)}>+</button></div><button aria-label={`Remove ${item.name} from cart`} onClick={()=>removeItem(item.menuItemId)} className="text-lg text-slate-300 hover:text-red-500">⌫</button></div>)}</div></section>
    <section className="kb-cart-card mt-4"><div className="flex justify-between text-sm text-slate-600"><span>Subtotal</span><b className="text-slate-900">${subtotal.toFixed(2)}</b></div>{deliveryFeeEstimate!=null&&<div className="mt-3 flex justify-between text-sm text-slate-600"><span>Delivery Fee</span><span>${deliveryFeeEstimate.toFixed(2)}</span></div>}<div className="mt-4 border-t border-slate-100 pt-4 flex justify-between"><span className="text-base font-black">Total</span><span className="text-xl font-black">${total.toFixed(2)}</span></div><div className="kb-no-fee mt-4"><span>🏷️</span><div><b>No Platform Fee</b><small>100% of the food payment goes to our home cooks and hawkers.</small></div></div></section>
    <button onClick={()=>setCheckout(true)} className="kb-primary-button mt-5 w-full">Proceed to Checkout <span>${total.toFixed(2)}</span></button>
   </>:<>
