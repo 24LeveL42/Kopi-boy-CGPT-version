@@ -9,239 +9,28 @@ import { useCustomerLocation } from "@/lib/use-customer-location";
 import { haversineDistanceKm, estimateDeliveryFee } from "@/lib/distance";
 import { createClient } from "@/lib/supabase/client";
 import { Spinner } from "@/components/Spinner";
+import { BottomNav } from "@/components/BottomNav";
 
 export function CartView({ isSignedIn }: { isSignedIn: boolean }) {
-  const { cart, setQuantity, removeItem, subtotal, clearCart } = useCart();
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
-  const { coords, status: locationStatus, requestLocation } = useCustomerLocation();
-  const [kitchenCoords, setKitchenCoords] = useState<{ latitude: number | null; longitude: number | null } | null>(
-    null
-  );
-
-  // Fetched fresh at checkout (not carried in the cart) so the fee estimate
-  // reflects the kitchen's current coordinates.
-  useEffect(() => {
-    if (!cart) return;
-    let cancelled = false;
-    createClient()
-      .from("kitchens")
-      .select("latitude, longitude")
-      .eq("id", cart.kitchenId)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!cancelled) setKitchenCoords(data ?? null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [cart]);
-
-  const distanceKm =
-    coords && kitchenCoords?.latitude != null && kitchenCoords?.longitude != null
-      ? haversineDistanceKm(coords.latitude, coords.longitude, kitchenCoords.latitude, kitchenCoords.longitude)
-      : null;
-  const deliveryFeeEstimate = distanceKm != null ? estimateDeliveryFee(distanceKm) : null;
-
-  if (!cart || cart.items.length === 0) {
-    return (
-      <div className="min-h-screen px-4 py-8 sm:px-6" style={{ background: "var(--kb-navy)", color: "var(--kb-on-navy)" }}>
-        <div className="mx-auto max-w-sm text-center">
-          <h1 className="font-display text-xl font-bold">Your cart</h1>
-          <p className="mt-4" style={{ color: "var(--kb-on-navy-soft)" }}>
-            Your cart is empty.
-          </p>
-          <Link
-            href="/"
-            className="mt-6 inline-block rounded-xl px-5 py-2.5 text-sm font-semibold text-white"
-            style={{ background: "linear-gradient(90deg, var(--kb-purple) 0%, var(--kb-green) 100%)" }}
-          >
-            Browse merchants
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  function handlePlaceOrder() {
-    if (!cart) return;
-    setError(null);
-    startTransition(async () => {
-      try {
-        const { orderId } = await placeOrder(
-          cart.kitchenId,
-          cart.items.map((i) => ({ menuItemId: i.menuItemId, quantity: i.quantity })),
-          coords
-        );
-        clearCart();
-        router.push(`/orders/${orderId}`);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Something went wrong — please try again.");
-      }
-    });
-  }
-
-  return (
-    <div className="min-h-screen px-4 py-8 sm:px-6" style={{ background: "var(--kb-navy)", color: "var(--kb-on-navy)" }}>
-      <div className="mx-auto max-w-md">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="font-display text-xl font-bold">Your cart</h1>
-            <p className="mt-1 text-sm" style={{ color: "var(--kb-on-navy-soft)" }}>
-              {cart.kitchenName}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              // Confirmed, unlike the per-line remove: this throws away the whole order in one tap.
-              if (window.confirm("Remove everything from your cart?")) clearCart();
-            }}
-            className="shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold"
-            style={{ borderColor: "var(--kb-navy-line)", color: "var(--kb-on-navy)" }}
-          >
-            Clear all
-          </button>
-        </div>
-
-        <div className="mt-5 space-y-3">
-          {cart.items.map((item) => (
-            <div
-              key={item.menuItemId}
-              className="flex items-center justify-between gap-3 rounded-xl bg-white p-3 shadow"
-              style={{ color: "var(--kb-ink)" }}
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold">{item.name}</p>
-                <p className="text-sm" style={{ color: "var(--kb-ink-soft)" }}>
-                  ${item.price.toFixed(2)} each
-                </p>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <button
-                  aria-label={`Decrease ${item.name} quantity`}
-                  onClick={() => setQuantity(item.menuItemId, item.quantity - 1)}
-                  className="flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold"
-                  style={{ background: "var(--kb-cream)" }}
-                >
-                  &minus;
-                </button>
-                <span className="w-4 text-center text-sm font-semibold">{item.quantity}</span>
-                <button
-                  aria-label={`Increase ${item.name} quantity`}
-                  onClick={() => setQuantity(item.menuItemId, item.quantity + 1)}
-                  className="flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold text-white"
-                  style={{ background: "var(--kb-green-deep)" }}
-                >
-                  +
-                </button>
-                <button
-                  aria-label={`Remove ${item.name} from cart`}
-                  onClick={() => removeItem(item.menuItemId)}
-                  className="ml-1 flex h-7 w-7 items-center justify-center rounded-full"
-                  style={{ color: "var(--kb-danger)" }}
-                >
-                  <TrashIcon />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-6 rounded-xl bg-white p-4 shadow" style={{ color: "var(--kb-ink)" }}>
-          {!coords && (
-            <div className="mb-3">
-              <button
-                type="button"
-                onClick={requestLocation}
-                disabled={locationStatus === "locating"}
-                className="flex w-full items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium disabled:opacity-60"
-                style={{ borderColor: "#E5E7EB", color: "var(--kb-purple)" }}
-              >
-                {locationStatus === "locating" && <Spinner />}
-                {locationStatus === "locating" ? "Getting your location…" : "Use my current location"}
-              </button>
-              {locationStatus === "denied" && (
-                <p className="mt-1 text-xs" style={{ color: "var(--kb-ink-soft)" }}>
-                  Location permission was denied — no problem, you can still place your order. We just
-                  won&apos;t be able to estimate the delivery fee up front.
-                </p>
-              )}
-              {locationStatus === "unavailable" && (
-                <p className="mt-1 text-xs" style={{ color: "var(--kb-ink-soft)" }}>
-                  Couldn&apos;t get your location right now — no problem, this is optional and won&apos;t stop
-                  your order.
-                </p>
-              )}
-              {locationStatus === "unsupported" && (
-                <p className="mt-1 text-xs" style={{ color: "var(--kb-ink-soft)" }}>
-                  Your browser doesn&apos;t support location detection — no problem, this is optional.
-                </p>
-              )}
-            </div>
-          )}
-
-          <div className="flex items-center justify-between">
-            <span className="font-semibold">Subtotal</span>
-            <span className="font-semibold">${subtotal.toFixed(2)}</span>
-          </div>
-
-          {deliveryFeeEstimate != null && (
-            <>
-              <div className="mt-2 flex items-center justify-between text-sm" style={{ color: "var(--kb-ink-soft)" }}>
-                <span>Estimated delivery fee</span>
-                <span>${deliveryFeeEstimate.toFixed(2)}</span>
-              </div>
-              <p className="mt-1 text-xs" style={{ color: "var(--kb-ink-soft)" }}>
-                Estimate only, based on distance — the cook and rider confirm the actual fee between
-                themselves. Not collected by Kopi Boy; pay the cook directly via PayNow once accepted.
-              </p>
-            </>
-          )}
-        </div>
-
-        {isSignedIn ? (
-          <>
-            <button
-              onClick={handlePlaceOrder}
-              disabled={pending}
-              className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold text-white disabled:opacity-60"
-              style={{ background: "linear-gradient(90deg, var(--kb-purple) 0%, var(--kb-green) 100%)" }}
-            >
-              {pending && <Spinner />}
-              {pending ? "Placing order…" : "Place order"}
-            </button>
-            {error && (
-              <p className="mt-2 text-sm" style={{ color: "var(--kb-danger)" }}>
-                {error}
-              </p>
-            )}
-          </>
-        ) : (
-          <div className="mt-5 rounded-xl bg-white p-4 text-center shadow" style={{ color: "var(--kb-ink)" }}>
-            <p style={{ color: "var(--kb-ink-soft)" }}>Sign in to place your order.</p>
-            <Link
-              href="/login"
-              className="mt-3 inline-block w-full rounded-xl py-2.5 text-sm font-semibold text-white"
-              style={{ background: "linear-gradient(90deg, var(--kb-purple) 0%, var(--kb-green) 100%)" }}
-            >
-              Sign in
-            </Link>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function TrashIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <polyline points="3 6 5 6 21 6" />
-      <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
-      <path d="M10 11v6M14 11v6" />
-      <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" />
-    </svg>
-  );
+ const {cart,setQuantity,removeItem,subtotal,clearCart}=useCart(); const [checkout,setCheckout]=useState(false); const [pending,startTransition]=useTransition(); const [error,setError]=useState<string|null>(null); const router=useRouter(); const {coords,status:locationStatus,requestLocation}=useCustomerLocation(); const [kitchenCoords,setKitchenCoords]=useState<{latitude:number|null;longitude:number|null}|null>(null);
+ useEffect(()=>{if(!cart)return;let cancelled=false;createClient().from("kitchens").select("latitude, longitude").eq("id",cart.kitchenId).maybeSingle().then(({data})=>{if(!cancelled)setKitchenCoords(data??null)});return()=>{cancelled=true}},[cart]);
+ const distanceKm=coords&&kitchenCoords?.latitude!=null&&kitchenCoords?.longitude!=null?haversineDistanceKm(coords.latitude,coords.longitude,kitchenCoords.latitude,kitchenCoords.longitude):null; const deliveryFeeEstimate=distanceKm!=null?estimateDeliveryFee(distanceKm):null; const total=subtotal+(deliveryFeeEstimate??0);
+ if(!cart||cart.items.length===0)return <div className="kb-app-shell min-h-screen pb-28"><div className="mx-auto max-w-md px-5 py-16 text-center"><div className="kb-empty-illustration">🛍️</div><h1 className="mt-5 text-2xl font-black">Your cart is waiting</h1><p className="mt-2 text-sm leading-6 text-slate-500">Add something delicious from a neighbourhood cook or hawker.</p><Link href="/" className="kb-primary-button mt-6 inline-flex">Explore local food</Link></div><BottomNav/></div>;
+ function handlePlaceOrder(){if(!cart)return;setError(null);startTransition(async()=>{try{const {orderId}=await placeOrder(cart.kitchenId,cart.items.map(i=>({menuItemId:i.menuItemId,quantity:i.quantity})),coords);clearCart();router.push(`/orders/${orderId}`)}catch(e){setError(e instanceof Error?e.message:"Something went wrong — please try again.")}})}
+ return <div className="kb-app-shell min-h-screen pb-32"><main className="mx-auto max-w-md px-4 py-5 sm:px-6">
+  {!checkout?<>
+   <div className="kb-checkout-title"><div><p className="kb-eyebrow">YOUR BAG</p><h1>Your Cart</h1><p>{cart.kitchenName}</p></div><button onClick={()=>{if(window.confirm("Remove everything from your cart?"))clearCart()}} className="kb-text-button">Clear All</button></div>
+   <section className="kb-cart-card mt-5"><div className="flex items-center justify-between border-b border-slate-100 pb-3"><div><p className="text-xs font-bold uppercase tracking-[.14em] text-purple-600">Your order</p><p className="mt-1 text-sm font-bold text-slate-900">{cart.items.reduce((s,i)=>s+i.quantity,0)} items from {cart.kitchenName}</p></div><span className="kb-mini-pill">Direct to cook</span></div><div className="divide-y divide-slate-100">{cart.items.map(item=><div key={item.menuItemId} className="flex items-center gap-3 py-4"><div className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-purple-100 to-emerald-100 text-2xl">🍽️</div><div className="min-w-0 flex-1"><p className="truncate text-sm font-extrabold text-slate-900">{item.name}</p><p className="mt-0.5 text-xs text-slate-500">${item.price.toFixed(2)}</p></div><div className="kb-quantity"><button aria-label={`Decrease ${item.name} quantity`} onClick={()=>setQuantity(item.menuItemId,item.quantity-1)}>−</button><b>{item.quantity}</b><button aria-label={`Increase ${item.name} quantity`} onClick={()=>setQuantity(item.menuItemId,item.quantity+1)}>+</button></div><button aria-label={`Remove ${item.name} from cart`} onClick={()=>removeItem(item.menuItemId)} className="text-lg text-slate-300 hover:text-red-500">⌫</button></div>)}</div></section>
+   <section className="kb-cart-card mt-4"><div className="flex justify-between text-sm text-slate-600"><span>Subtotal</span><b className="text-slate-900">${subtotal.toFixed(2)}</b></div>{deliveryFeeEstimate!=null&&<div className="mt-3 flex justify-between text-sm text-slate-600"><span>Delivery Fee</span><span>${deliveryFeeEstimate.toFixed(2)}</span></div>}<div className="mt-4 border-t border-slate-100 pt-4 flex justify-between"><span className="text-base font-black">Total</span><span className="text-xl font-black">${total.toFixed(2)}</span></div><div className="kb-no-fee mt-4"><span>🏷️</span><div><b>No Platform Fee</b><small>100% of the food payment goes to our home cooks and hawkers.</small></div></div></section>
+   <button onClick={()=>setCheckout(true)} className="kb-primary-button mt-5 w-full">Proceed to Checkout <span>${total.toFixed(2)}</span></button>
+  </>:<>
+   <div className="kb-checkout-title"><button onClick={()=>setCheckout(false)} className="kb-outline-button">← Back</button><div className="text-right"><p className="kb-eyebrow">FINAL STEP</p><h1>Checkout</h1></div></div>
+   <section className="kb-cart-card mt-5"><p className="text-xs font-black uppercase tracking-[.14em] text-purple-600">Delivery Address</p><div className="mt-3 flex items-center gap-3 rounded-2xl bg-[#faf8ff] p-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-purple-100 text-purple-700">⌂</span><div className="flex-1"><b className="block text-sm">Current location</b><small className="text-xs text-slate-500">Used to estimate delivery distance</small></div><button type="button" onClick={requestLocation} className="kb-text-button">{coords?"Ready":"Change"}</button></div>{!coords&&locationStatus!=="idle"&&<p className="mt-2 text-xs text-slate-500">{locationStatus==="denied"?"Location permission was denied — you can still place the order.":"Location isn't available right now — you can still place the order."}</p>}</section>
+   <section className="kb-cart-card mt-4"><p className="text-xs font-black uppercase tracking-[.14em] text-purple-600">Delivery Option</p><div className="mt-3 grid grid-cols-2 gap-2"><div className="rounded-2xl border-2 border-purple-500 bg-purple-50 p-3"><b className="block text-sm text-purple-700">🛵 Standard</b><span className="text-xs text-slate-500">25–40 min</span><strong className="mt-1 block text-xs">${deliveryFeeEstimate?.toFixed(2) ?? "—"}</strong></div><div className="rounded-2xl border border-slate-200 bg-white p-3 opacity-65"><b className="block text-sm">▣ Schedule</b><span className="text-xs text-slate-500">Later today</span><strong className="mt-1 block text-xs">Coming soon</strong></div></div></section>
+   <section className="kb-cart-card mt-4"><p className="text-xs font-black uppercase tracking-[.14em] text-purple-600">Payment Method</p><div className="mt-3 flex items-center gap-3 rounded-2xl border border-slate-200 p-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-purple-100 text-purple-700">▣</span><div><b className="block text-sm">Pay to Cook Directly</b><small className="text-xs text-slate-500">Cash / PayNow / QR</small></div><span className="ml-auto text-purple-600">✓</span></div></section>
+   <section className="kb-cart-card mt-4"><div className="flex justify-between text-sm"><span>Subtotal</span><b>${subtotal.toFixed(2)}</b></div>{deliveryFeeEstimate!=null&&<div className="mt-2 flex justify-between text-sm text-slate-600"><span>Delivery Fee</span><span>${deliveryFeeEstimate.toFixed(2)}</span></div>}<div className="mt-3 flex justify-between border-t border-slate-100 pt-3"><b>Total</b><strong className="text-xl">${total.toFixed(2)}</strong></div></section>
+   {isSignedIn?<><button onClick={handlePlaceOrder} disabled={pending} className="kb-primary-button mt-5 w-full">{pending&&<Spinner/>}{pending?"Confirming order…":<>Confirm Order <span>${total.toFixed(2)}</span></>}</button>{error&&<p className="mt-3 rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-600">{error}</p>}</>:<div className="kb-signin-card mt-5"><p className="font-extrabold">Almost there</p><p className="mt-1 text-sm text-slate-500">Sign in to place your order.</p><Link href="/login" className="kb-primary-button mt-4 w-full">Sign in & continue</Link></div>}
+  </>}
+  <p className="mt-4 text-center text-[11px] leading-5 text-slate-400">Kopi Boy charges no platform fee. Delivery fee is an estimate until the cook and rider confirm it.</p>
+ </main><BottomNav/></div>;
 }

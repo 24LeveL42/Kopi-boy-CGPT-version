@@ -61,12 +61,12 @@ export default async function OrdersPage() {
   }
 
   return (
-    <div className="min-h-screen px-4 pb-28 pt-8 sm:px-6" style={{ background: "var(--kb-navy)", color: "var(--kb-on-navy)" }}>
-      <div className="mx-auto max-w-sm">
-        <h1 className="font-display text-xl font-bold">My orders</h1>
+    <div className="kb-app-shell min-h-screen pb-28">
+      <div className="mx-auto max-w-md px-4 py-6 sm:px-6">
+        <div className="kb-page-title"><div><p className="kb-eyebrow">YOUR ACTIVITY</p><h1>My Orders</h1><p>Track every Kopi Boy order in one place.</p></div></div>
 
         {!user ? (
-          <div className="mt-6 rounded-2xl bg-white p-5 text-center shadow-lg" style={{ color: "var(--kb-ink)" }}>
+          <div className="kb-signin-card mt-5">
             <p style={{ color: "var(--kb-ink-soft)" }}>Sign in to see your orders.</p>
             <Link
               href="/login"
@@ -77,11 +77,11 @@ export default async function OrdersPage() {
             </Link>
           </div>
         ) : loadFailed ? (
-          <p className="mt-6 rounded-2xl bg-white p-5 text-sm shadow-lg" style={{ color: "var(--kb-danger)" }}>
+          <p className="kb-error-card mt-5">
             Couldn&apos;t load your orders — please try again.
           </p>
         ) : orders.length === 0 ? (
-          <div className="mt-6 rounded-2xl bg-white p-5 text-center shadow-lg" style={{ color: "var(--kb-ink)" }}>
+          <div className="kb-signin-card mt-5">
             <p style={{ color: "var(--kb-ink-soft)" }}>No orders yet.</p>
             <Link
               href="/"
@@ -101,8 +101,7 @@ export default async function OrdersPage() {
                     <Link
                       href={`/orders/${order.id}`}
                       data-testid="order-history-row"
-                      className="block rounded-2xl bg-white p-4 shadow-lg"
-                      style={{ color: "var(--kb-ink)" }}
+                      className="kb-order-history-card"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
@@ -113,7 +112,7 @@ export default async function OrdersPage() {
                         </div>
                         <span className="shrink-0 text-sm font-semibold">${order.subtotal.toFixed(2)}</span>
                       </div>
-                      <p className="mt-2 inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold" style={STAGE_STYLE[stage.tone]}>
+                      <p className="mt-3 inline-flex rounded-full px-3 py-1 text-[11px] font-extrabold" style={STAGE_STYLE[stage.tone]}>
                         {stage.message}
                       </p>
                     </Link>

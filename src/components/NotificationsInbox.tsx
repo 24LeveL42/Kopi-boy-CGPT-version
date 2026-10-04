@@ -18,16 +18,14 @@ export function NotificationsInbox() {
   const [retrying, startRetry] = useTransition();
 
   return (
-    <div className="min-h-screen px-4 py-8 sm:px-6" style={{ background: "var(--kb-navy)", color: "var(--kb-on-navy)" }}>
-      <div className="mx-auto max-w-sm">
-        <div className="flex items-center justify-between">
-          <h1 className="font-display text-xl font-bold">Notifications</h1>
+    <div className="kb-app-shell min-h-screen pb-28">
+      <div className="mx-auto max-w-md px-4 py-6 sm:px-6">
+        <div className="kb-page-title"><div><p className="kb-eyebrow">STAY IN THE LOOP</p><h1>Notifications</h1><p>Order updates and important Kopi Boy messages.</p></div>
           {unreadCount > 0 && (
             <button
               type="button"
               onClick={() => void markAllRead()}
-              className="rounded-full px-3 py-1 text-xs font-semibold"
-              style={{ background: "var(--kb-navy-raised)", color: "var(--kb-on-navy)" }}
+              className="kb-outline-button"
             >
               Mark all as read
             </button>
@@ -35,7 +33,7 @@ export function NotificationsInbox() {
         </div>
 
         {(status === "idle" || status === "loading") && (
-          <div className="mt-4 space-y-2">
+          <div className="mt-5 space-y-2">
             <LoadingStatus label="Loading your notifications…" />
             {Array.from({ length: 4 }, (_, i) => (
               <div key={i} className="flex items-start gap-2 rounded-2xl bg-white p-3 shadow-sm">
@@ -50,7 +48,7 @@ export function NotificationsInbox() {
         )}
 
         {status === "signed-out" && (
-          <div className="mt-6 rounded-2xl bg-white p-5 text-center shadow-lg" style={{ color: "var(--kb-ink)" }}>
+          <div className="kb-signin-card mt-5">
             <p style={{ color: "var(--kb-ink-soft)" }}>Sign in to see updates about your orders.</p>
             <Link
               href="/login"
@@ -63,7 +61,7 @@ export function NotificationsInbox() {
         )}
 
         {status === "error" && (
-          <div className="mt-6 rounded-2xl bg-white p-5 text-center shadow-lg" style={{ color: "var(--kb-ink)" }}>
+          <div className="kb-signin-card mt-5">
             <p style={{ color: "var(--kb-danger)" }}>Couldn&apos;t load your notifications.</p>
             <button
               type="button"
@@ -79,7 +77,7 @@ export function NotificationsInbox() {
         )}
 
         {status === "ready" && notifications.length === 0 && (
-          <div className="mt-6 rounded-2xl bg-white p-5 text-center shadow-lg" style={{ color: "var(--kb-ink)" }}>
+          <div className="kb-signin-card mt-5">
             <p className="font-semibold">Nothing yet</p>
             <p className="mt-1 text-sm" style={{ color: "var(--kb-ink-soft)" }}>
               Updates about your orders — accepted, ready, rider on the way, delivered — will show up here.
@@ -88,7 +86,7 @@ export function NotificationsInbox() {
         )}
 
         {status === "ready" && notifications.length > 0 && (
-          <ul className="mt-4 space-y-2">
+          <ul className="mt-5 space-y-2">
             {notifications.map((n) => (
               <li key={n.id}>
                 <NotificationItem notification={n} onOpen={() => void markRead(n.id)} />
@@ -126,7 +124,7 @@ function NotificationItem({ notification: n, onOpen }: { notification: Notificat
     </>
   );
 
-  const className = "flex w-full items-start gap-2 rounded-2xl bg-white p-3 shadow-sm";
+  const className = "kb-notification-card";
   const style = { color: "var(--kb-ink)", opacity: unread ? 1 : 0.8 };
 
   return href ? (

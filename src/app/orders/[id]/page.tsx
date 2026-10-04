@@ -261,10 +261,10 @@ export default async function OrderConfirmationPage({
   const chatVisible = Boolean(user) && activeDelivery?.status === "accepted" && !header.failed;
 
   return (
-    <div className="min-h-screen px-4 py-8 sm:px-6" style={{ background: "var(--kb-navy)", color: "var(--kb-on-navy)" }}>
+    <div className="kb-app-shell min-h-screen pb-28">
       <OrderRealtimeRefresher orderId={order.id} isSettled={isSettled} />
-      <div className="mx-auto max-w-sm">
-        <div className="rounded-2xl bg-white p-6 text-center shadow-lg" style={{ color: "var(--kb-ink)" }}>
+      <div className="mx-auto max-w-md px-4 py-5 sm:px-6">
+        <div className="kb-order-detail-card">
           <div
             data-testid="order-header-icon"
             data-failed={header.failed}
