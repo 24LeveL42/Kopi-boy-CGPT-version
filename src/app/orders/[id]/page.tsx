@@ -7,6 +7,7 @@ import { OrderProgress, type ProgressPosition } from "@/components/OrderProgress
 import { RiderCard, type RiderInfo } from "@/components/RiderCard";
 import { OrderChat } from "@/components/OrderChat";
 import { ProofOfDeliveryCard } from "@/components/ProofOfDeliveryCard";
+import { RiderLocationMap } from "@/components/RiderLocationMap";
 import { ORDER_CHAT_PHOTO_BUCKET, ORDER_CHAT_PHOTO_URL_TTL_SECONDS, type MessageRow } from "@/lib/messages";
 import { SupportChatToggle } from "@/components/SupportChat";
 import { OrderRating, RateOrder } from "@/components/RateOrder";
@@ -214,6 +215,17 @@ export default async function OrderConfirmationPage({
     rider = (data as RiderInfo[] | null)?.[0] ?? null;
   }
 
+  // Live rider map, while a rider is on the way. get_order_active_delivery()
+  // only returns the delivery_request id for the signed-in customer's own
+  // order (null otherwise), and rider_live_locations RLS is scoped the same
+  // way — so the map never renders for anyone else's order. If the RPC isn't
+  // installed yet it errors -> null -> no map, rest of the page unaffected.
+  let liveDeliveryRequestId: string | null = null;
+  if (user && activeDelivery?.status === "accepted" && !header.failed) {
+    const { data } = await supabase.rpc("get_order_active_delivery", { p_order_id: id });
+    liveDeliveryRequestId = typeof data === "string" ? data : null;
+  }
+
   // Proof-of-delivery photo, once delivered. The chat is closed by then; RLS
   // still lets the customer read just this message and sign its photo (Partner
   // app's docs/supabase-messages.sql §7). If that migration hasn't run, the
@@ -292,6 +304,7 @@ export default async function OrderConfirmationPage({
             </p>
           )}
           {rider && <RiderCard rider={rider} />}
+          {liveDeliveryRequestId && <RiderLocationMap deliveryRequestId={liveDeliveryRequestId} />}
           {proofPhotoUrl && (
             <ProofOfDeliveryCard photoUrl={proofPhotoUrl} deliveredAt={formatTimestamp(activeDelivery?.completed_at ?? null)} />
           )}

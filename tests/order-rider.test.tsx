@@ -13,6 +13,7 @@ const db = vi.hoisted(() => ({
   deliveries: [] as unknown[],
   rpcResult: { data: null, error: null } as { data: unknown; error: unknown },
   rpcCalls: [] as { fn: string; args: unknown }[],
+  activeDeliveryId: null as string | null,
   proof: null as { photo_path: string | null } | null,
   messageFilters: [] as [string, unknown][],
   signedPaths: [] as string[],
@@ -26,6 +27,7 @@ vi.mock("@/lib/supabase/server", () => ({
     },
     rpc(fn: string, args: unknown) {
       db.rpcCalls.push({ fn, args });
+      if (fn === "get_order_active_delivery") return Promise.resolve({ data: db.activeDeliveryId, error: null });
       return Promise.resolve(db.rpcResult);
     },
     storage: {
@@ -58,6 +60,11 @@ vi.mock("@/lib/supabase/server", () => ({
   }),
 }));
 vi.mock("@/components/OrderRealtimeRefresher", () => ({ OrderRealtimeRefresher: () => null }));
+vi.mock("@/components/RiderLocationMap", () => ({
+  RiderLocationMap: ({ deliveryRequestId }: { deliveryRequestId: string }) => (
+    <div data-testid="rider-location-map" data-delivery-request-id={deliveryRequestId} />
+  ),
+}));
 vi.mock("@/components/CancelOrderButton", () => ({ CancelOrderButton: () => null }));
 vi.mock("@/components/OrderChat", () => ({ OrderChat: () => null }));
 vi.mock("@/components/RateOrder", () => ({
@@ -96,6 +103,7 @@ async function renderPage(o: OrderRow, deliveries: DeliveryRequestRow[], rpcData
 beforeEach(() => {
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", SUPABASE);
   db.rpcCalls = [];
+  db.activeDeliveryId = null;
   db.proof = null;
   db.messageFilters = [];
   db.signedPaths = [];
@@ -113,7 +121,29 @@ describe("/orders/[id] — rider card", () => {
     expect(card).toHaveTextContent("Your rider: Ahmad Rahman");
     const img = within(card).getByAltText("Photo of Ahmad Rahman") as HTMLImageElement;
     expect(decodeURIComponent(img.getAttribute("src")!)).toContain(PHOTO);
-    expect(db.rpcCalls).toEqual([{ fn: "get_order_rider", args: { p_order_id: "order-1" } }]);
+    expect(db.rpcCalls).toEqual([
+      { fn: "get_order_rider", args: { p_order_id: "order-1" } },
+      { fn: "get_order_active_delivery", args: { p_order_id: "order-1" } },
+    ]);
+  });
+
+  it("shows the live rider map for the active delivery while the rider is on the way", async () => {
+    db.activeDeliveryId = "dr-1";
+    const { container } = await renderPage(order(), [accepted]);
+    const map = within(container).getByTestId("rider-location-map");
+    expect(map).toHaveAttribute("data-delivery-request-id", "dr-1");
+  });
+
+  it("shows no live map when get_order_active_delivery returns null", async () => {
+    const { container } = await renderPage(order(), [accepted]);
+    expect(within(container).queryByTestId("rider-location-map")).toBeNull();
+  });
+
+  it("doesn't look up the live map once the delivery is completed", async () => {
+    db.activeDeliveryId = "dr-1";
+    const { container } = await renderPage(order(), [completed]);
+    expect(within(container).queryByTestId("rider-location-map")).toBeNull();
+    expect(db.rpcCalls.map((c) => c.fn)).not.toContain("get_order_active_delivery");
   });
 
   it("shows the proof-of-delivery photo once the delivery is completed", async () => {
