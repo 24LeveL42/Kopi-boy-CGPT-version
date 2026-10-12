@@ -2,24 +2,28 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useReducer, useSyncExternalStore } from "react";
 import { Merchant } from "@/lib/types";
 import { CategoryPill, RegisteredBadge } from "./KitchenBadges";
 
 const FAV_KEY = "kb-favourites";
+// The card doesn't follow other cards' toggles; it re-reads storage when it renders.
+const noSubscribe = () => () => {};
+
+function isFav(id: string) {
+  try { return JSON.parse(localStorage.getItem(FAV_KEY) || "[]").includes(id) === true; } catch { return false; }
+}
 
 export function MerchantCard({ merchant, variant = "grid" }: { merchant: Merchant; variant?: "grid" | "list" }) {
-  const [fav, setFav] = useState(false);
-  useEffect(() => {
-    try { setFav(JSON.parse(localStorage.getItem(FAV_KEY) || "[]").includes(merchant.id)); } catch {}
-  }, [merchant.id]);
+  const fav = useSyncExternalStore(noSubscribe, () => isFav(merchant.id), () => false);
+  const [, rerender] = useReducer((n: number) => n + 1, 0);
   const toggle = (e: React.MouseEvent) => {
     e.preventDefault(); e.stopPropagation();
     try {
       const ids: string[] = JSON.parse(localStorage.getItem(FAV_KEY) || "[]");
       const next = ids.includes(merchant.id) ? ids.filter(id => id !== merchant.id) : [...ids, merchant.id];
       localStorage.setItem(FAV_KEY, JSON.stringify(next));
-      setFav(next.includes(merchant.id));
+      rerender();
       window.dispatchEvent(new Event("kb-favourites-changed"));
     } catch {}
   };

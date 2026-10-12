@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { MenuItemRow } from "@/components/MenuItemRow";
-import { CategoryPill, RatingSummary, RegisteredBadge } from "@/components/KitchenBadges";
+import { CategoryPill, RegisteredBadge } from "@/components/KitchenBadges";
 import { formatKitchenArea, selectKitchens } from "@/lib/kitchens";
 import { BottomNav } from "@/components/BottomNav";
 import type { MerchantCategory } from "@/lib/types";
