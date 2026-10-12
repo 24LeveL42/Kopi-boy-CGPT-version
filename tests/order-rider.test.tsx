@@ -66,6 +66,7 @@ vi.mock("@/components/RiderLocationMap", () => ({
   ),
 }));
 vi.mock("@/components/CancelOrderButton", () => ({ CancelOrderButton: () => null }));
+vi.mock("@/components/PaymentProofCard", () => ({ PaymentProofCard: () => null }));
 vi.mock("@/components/OrderChat", () => ({ OrderChat: () => null }));
 vi.mock("@/components/RateOrder", () => ({
   RateOrder: () => <div data-testid="rate-order" />,

@@ -38,6 +38,9 @@ vi.mock("@/components/OrderRealtimeRefresher", () => ({ OrderRealtimeRefresher: 
 vi.mock("@/components/CancelOrderButton", () => ({ CancelOrderButton: () => null }));
 vi.mock("@/components/OrderChat", () => ({ OrderChat: () => null }));
 vi.mock("@/components/RateOrder", () => ({ RateOrder: () => null, OrderRating: () => null }));
+vi.mock("@/components/PaymentProofCard", () => ({
+  PaymentProofCard: ({ state }: { state: string }) => <div data-testid="payment-proof-card" data-state={state} />,
+}));
 vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("notFound"); } }));
 
 function order(overrides: Partial<OrderRow> = {}): OrderRow {
@@ -192,7 +195,12 @@ describe("/orders/[id] progress bar — every state, through the real page", () 
       expect(heading).toHaveTextContent("Order placed!");
       expect(within(container).getByText("Aunty May has received your order.")).toBeInTheDocument();
       expect(icon).toHaveAttribute("data-failed", "false");
-      expect(within(container).getByText("Payment pending — pay the cook via PayNow once accepted")).toBeInTheDocument();
+      if (s.order.order_status === "placed") {
+        expect(within(container).getByText("Payment pending — pay the cook via PayNow once accepted")).toBeInTheDocument();
+      } else {
+        // Accepted + unpaid: the pay-and-upload card replaces the one-line message.
+        expect(within(container).getByTestId("payment-proof-card")).toHaveAttribute("data-state", "pay");
+      }
       expect(icon.style.background).toBe("var(--kb-green-deep)");
       expect(bar).not.toBeNull();
       const items = Array.from(bar!.querySelectorAll("li"));

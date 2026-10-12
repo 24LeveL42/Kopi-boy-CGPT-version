@@ -11,6 +11,12 @@ import { RiderLocationMap } from "@/components/RiderLocationMap";
 import { ORDER_CHAT_PHOTO_BUCKET, ORDER_CHAT_PHOTO_URL_TTL_SECONDS, type MessageRow } from "@/lib/messages";
 import { SupportChatToggle } from "@/components/SupportChat";
 import { OrderRating, RateOrder } from "@/components/RateOrder";
+import { PaymentProofCard } from "@/components/PaymentProofCard";
+import {
+  PAYMENT_PROOF_BUCKET,
+  PAYMENT_PROOF_URL_TTL_SECONDS,
+  getPaymentProofState,
+} from "@/lib/payment-proof";
 
 export interface OrderRow {
   id: string;
@@ -24,6 +30,10 @@ export interface OrderRow {
   created_at: string;
   decided_at: string | null;
   ready_at: string | null;
+  /** Payment proof (src/lib/payment-proof.ts); absent where that migration hasn't run. */
+  payment_proof_path?: string | null;
+  payment_proof_uploaded_at?: string | null;
+  payment_proof_rejected_at?: string | null;
 }
 
 interface OrderItemRow {
@@ -263,6 +273,18 @@ export default async function OrderConfirmationPage({
   const deliveryFee = order.delivery_fee_estimate ?? null;
   const total = order.subtotal + (deliveryFee ?? 0);
 
+  // Pay-and-upload card once the cook accepts. Uploading needs a signed-in
+  // customer; without one the old one-line payment message stays.
+  const paymentState = getPaymentProofState(order);
+  const showPaymentCard = paymentState === "paid" || (paymentState !== null && Boolean(user));
+  let paymentProofUrl: string | null = null;
+  if (showPaymentCard && paymentState === "sent" && order.payment_proof_path) {
+    const { data: signed } = await supabase.storage
+      .from(PAYMENT_PROOF_BUCKET)
+      .createSignedUrl(order.payment_proof_path, PAYMENT_PROOF_URL_TTL_SECONDS);
+    paymentProofUrl = signed?.signedUrl ?? null;
+  }
+
   const isSettled =
     order.order_status === "cancelled" || order.order_status === "rejected" || activeDelivery?.status === "completed";
 
@@ -312,7 +334,19 @@ export default async function OrderConfirmationPage({
           {chatVisible && <OrderChat orderId={order.id} currentUserId={user!.id} riderName={rider?.full_name ?? null} />}
           {/* A cancelled/rejected order will never be accepted or paid for, so
               "pay via PayNow once accepted" would be wrong — hide the line. */}
-          {!header.failed && (
+          {showPaymentCard && paymentState ? (
+            <PaymentProofCard
+              orderId={order.id}
+              userId={user?.id ?? ""}
+              state={paymentState}
+              paynowLine={
+                getPaynowInstruction(kitchen?.paynow_type ?? null, kitchen?.paynow_value ?? null) ?? "Pay the cook via PayNow"
+              }
+              amount={total}
+              decidedAt={order.decided_at}
+              proofUrl={paymentProofUrl}
+            />
+          ) : !header.failed && (
             <p className="mt-1.5 text-xs" style={{ color: "var(--kb-ink-soft)" }}>
               {getPaymentMessage(order.payment_status, kitchen?.paynow_type ?? null, kitchen?.paynow_value ?? null)}
             </p>
