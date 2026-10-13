@@ -3,6 +3,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { quoteDeliveryForPostalCode } from "@/lib/delivery-quote";
 import { deliveryQuoteMessage, isDeliveryType, type DeliveryType } from "@/lib/delivery-types";
+import { getKitchenOrderStatus } from "@/lib/kitchens";
+import { UNAVAILABLE_ORDER_MESSAGE } from "@/lib/kitchen-availability";
 
 export type PlaceOrderResult = { ok: true; orderId: string } | { ok: false; message: string };
 
@@ -16,7 +18,8 @@ export type PlaceOrderResult = { ok: true; orderId: string } | { ok: false; mess
  * calls the quote_delivery RPC (src/lib/delivery-quote.ts) — no fee or
  * coordinates are ever taken from the client. If the fee can't be worked out
  * (lookup down, kitchen has no location yet, unknown postal code) no order
- * is created.
+ * is created. Nor is one created for a kitchen HQ has blocked — checked
+ * here against the database, not the client's cart.
  *
  * Returns a result object rather than throwing, for the same reason as
  * cancelOrder() below (thrown messages are redacted in production), and
@@ -44,8 +47,9 @@ export async function placeOrder(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, message: "Please sign in to place an order." };
 
-  const { data: kitchen } = await supabase.from("kitchens").select("id, is_live").eq("id", kitchenId).maybeSingle();
-  if (!kitchen || !kitchen.is_live) return { ok: false, message: "This kitchen isn't accepting orders right now." };
+  const kitchenStatus = await getKitchenOrderStatus(supabase, kitchenId);
+  if (kitchenStatus === "blocked") return { ok: false, message: UNAVAILABLE_ORDER_MESSAGE };
+  if (kitchenStatus !== "open") return { ok: false, message: "This kitchen isn't accepting orders right now." };
 
   const quote = await quoteDeliveryForPostalCode(supabase, kitchenId, postalCode, delivery.deliveryType);
   if (!quote.ok) return { ok: false, message: deliveryQuoteMessage(quote.reason) };

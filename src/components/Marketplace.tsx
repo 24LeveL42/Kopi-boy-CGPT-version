@@ -33,7 +33,7 @@ export function Marketplace({ merchants }: { merchants: Merchant[] }) {
   const { itemCount, subtotal } = useCart();
   const withDistance = useMemo(() => !coords ? merchants : merchants.map((m) => m.latitude != null && m.longitude != null ? { ...m, distanceKm: haversineDistanceKm(coords.latitude, coords.longitude, m.latitude, m.longitude) } : m), [merchants, coords]);
   const filtered = useMemo(() => filterMerchants(withDistance, query, category, cuisine), [withDistance, query, category, cuisine]);
-  const popular = useMemo(() => [...withDistance].sort((a, b) => b.rating - a.rating).slice(0, 6), [withDistance]);
+  const popular = useMemo(() => [...withDistance].sort((a, b) => Number(!!a.isBlocked) - Number(!!b.isBlocked) || b.rating - a.rating).slice(0, 6), [withDistance]);
   const isBrowsing = query.trim() !== "" || category !== "all" || cuisine !== "all";
 
   return <div className="kb-app-shell min-h-screen pb-28">

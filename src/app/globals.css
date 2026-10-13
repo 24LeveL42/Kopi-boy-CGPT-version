@@ -117,6 +117,10 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .kb-see-all { color:#08795d; font-size:12px; font-weight:900; white-space:nowrap; }
 .kb-merchant-card { display:block; overflow:hidden; border:1px solid rgba(35,29,54,.07); border-radius:23px; background:#fff; box-shadow:var(--kb-shadow); transition:transform .2s ease,box-shadow .2s ease; }
 .kb-merchant-card:hover { transform:translateY(-3px); box-shadow:0 18px 45px rgba(31,25,56,.13); }
+/* Blocked by HQ: faded, no hover lift (MerchantCard adds is-unavailable and drops `group`). */
+.kb-merchant-card.is-unavailable,.kb-merchant-list-card.is-unavailable { filter:grayscale(1); opacity:.5; }
+.kb-merchant-card.is-unavailable:hover { transform:none; box-shadow:var(--kb-shadow); }
+.kb-unavailable-pill { display:inline-block; border-radius:999px; background:#e2e8f0; color:#334155; padding:4px 8px; font-size:10px; font-weight:800; line-height:1; white-space:nowrap; }
 .kb-card-new { position:absolute; left:12px; top:12px; border-radius:999px; background:#11a979; color:#fff; padding:6px 9px; font-size:9px; font-weight:950; letter-spacing:.08em; }
 .kb-card-heart { position:absolute; right:12px; top:10px; display:grid; width:34px; height:34px; place-items:center; border-radius:999px; background:rgba(255,255,255,.92); color:#4b4756; font-size:20px; box-shadow:0 4px 14px rgba(0,0,0,.12); }
 .kb-rating-pill { border-radius:999px; background:#fff; color:#171521; padding:6px 9px; font-size:10px; font-weight:950; box-shadow:0 4px 15px rgba(0,0,0,.12); }

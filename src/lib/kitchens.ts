@@ -1,5 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { Merchant } from "@/lib/types";
+import { sortAvailableFirst } from "@/lib/kitchen-availability";
+
+type ServerSupabase = Awaited<ReturnType<typeof createClient>>;
 
 interface KitchenRow {
   id: string;
@@ -14,6 +17,8 @@ interface KitchenRow {
   business_uen?: string | null;
   latitude: number | null;
   longitude: number | null;
+  /** Absent until docs/supabase-blocked-merchants.sql runs (see selectKitchens). */
+  is_blocked?: boolean;
 }
 
 interface RatingSummaryRow {
@@ -55,7 +60,7 @@ const CATEGORY_FALLBACK_IMAGE: Record<Merchant["category"], string> = {
  */
 const KITCHEN_COLUMNS = ["id", "business_name", "category", "cuisine_type", "description", "hero_image", "latitude", "longitude"];
 /** Added by Partner-app migrations that may not have run yet on a given database. */
-const OPTIONAL_KITCHEN_COLUMNS = ["business_uen", "postal_code"];
+const OPTIONAL_KITCHEN_COLUMNS = ["business_uen", "postal_code", "is_blocked"];
 
 /**
  * Runs a kitchens query with KITCHEN_COLUMNS plus whichever optional columns
@@ -135,7 +140,7 @@ export async function getLiveMerchants(): Promise<Merchant[]> {
     .returns<RatingSummaryRow[]>();
   const summaryByKitchen = new Map((summaries ?? []).map((s) => [s.kitchen_id, s]));
 
-  return kitchens.map((k) => {
+  const merchants = kitchens.map((k) => {
     const kitchenItems = (items ?? []).filter((i) => i.kitchen_id === k.id);
     const prices = kitchenItems.map((i) => i.price);
     const image = k.hero_image ?? CATEGORY_FALLBACK_IMAGE[k.category];
@@ -161,6 +166,32 @@ export async function getLiveMerchants(): Promise<Merchant[]> {
       menuHighlights: kitchenItems.slice(0, 2).map((i) => ({ name: i.name, price: i.price })),
       isNew: true,
       businessUen: k.business_uen ?? null,
+      isBlocked: k.is_blocked === true,
     };
   });
+  return sortAvailableFirst(merchants);
+}
+
+/**
+ * Whether a kitchen can take a new order, read fresh from the database —
+ * never from anything the browser sends. "blocked" is HQ's block
+ * (kitchens.is_blocked); "unavailable" is not found / not live. Before
+ * docs/supabase-blocked-merchants.sql runs the column doesn't exist (42703),
+ * so it falls back to the is_live check alone.
+ */
+export async function getKitchenOrderStatus(
+  supabase: ServerSupabase,
+  kitchenId: string
+): Promise<"open" | "blocked" | "unavailable"> {
+  const withBlocked = await supabase
+    .from("kitchens")
+    .select("id, is_live, is_blocked")
+    .eq("id", kitchenId)
+    .maybeSingle<{ id: string; is_live: boolean; is_blocked?: boolean }>();
+  const { data: kitchen } =
+    withBlocked.error?.code === "42703"
+      ? await supabase.from("kitchens").select("id, is_live").eq("id", kitchenId).maybeSingle<{ id: string; is_live: boolean; is_blocked?: boolean }>()
+      : withBlocked;
+  if (!kitchen || !kitchen.is_live) return "unavailable";
+  return kitchen.is_blocked ? "blocked" : "open";
 }

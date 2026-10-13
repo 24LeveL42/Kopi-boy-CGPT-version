@@ -9,6 +9,7 @@ const push = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }), usePathname: () => "/cart" }));
 vi.mock("@/lib/order-actions", () => ({ placeOrder: vi.fn() }));
 vi.mock("@/lib/delivery-actions", () => ({ quoteDelivery: vi.fn() }));
+vi.mock("@/lib/kitchen-actions", () => ({ isKitchenBlocked: vi.fn(async () => false) }));
 
 const CART = {
   kitchenId: "k1",

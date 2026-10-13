@@ -57,4 +57,6 @@ export interface Merchant {
   isNew?: boolean;
   /** From the cook's HQ-approved application (never self-set) — backs the "Registered business" badge. */
   businessUen?: string | null;
+  /** HQ has blocked this cook (kitchens.is_blocked) — shown as "Currently unavailable", no new orders. */
+  isBlocked?: boolean;
 }
