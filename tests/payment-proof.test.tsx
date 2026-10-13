@@ -79,7 +79,7 @@ function order(overrides: Partial<OrderRow> = {}): OrderRow {
     id: ORDER_ID,
     kitchen_id: "kitchen-1",
     subtotal: 12.5,
-    delivery_fee_estimate: 3,
+    delivery_fee_estimate: 2.8,
     order_status: "accepted",
     payment_status: "unpaid",
     preparation_status: "not_started",
@@ -175,7 +175,7 @@ describe("/orders/[id] — payment proof card", () => {
       "Wait for the cook to confirm",
     ]);
     expect(card).toHaveTextContent("Pay via PayNow to UEN 201912345K");
-    expect(within(card).getByTestId("payment-amount")).toHaveTextContent("$15.50");
+    expect(within(card).getByTestId("payment-amount")).toHaveTextContent("$15.30");
     expect(card).toHaveTextContent("Put order #3F2A9C1E in the PayNow comment.");
     expect(card).toHaveTextContent("You can crop out your account number.");
     expect(card).toHaveTextContent("The cook starts cooking once they've checked the payment.");

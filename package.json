@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:node": "node --conditions=react-server --test \"src/**/*.test.ts\""
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.5",
@@ -16,7 +17,8 @@
     "leaflet": "^1.9.4",
     "next": "16.3.3",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

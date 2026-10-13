@@ -17,13 +17,18 @@ import {
   PAYMENT_PROOF_URL_TTL_SECONDS,
   getPaymentProofState,
 } from "@/lib/payment-proof";
+import { DELIVERY_TYPE_LABEL, isDeliveryType } from "@/lib/delivery-types";
 
 export interface OrderRow {
   id: string;
   kitchen_id: string;
   subtotal: number;
-  /** Absent on projects where schema section 18 hasn't run; null when no location was shared. */
+  /** Absent on projects where schema section 18 hasn't run; null on older orders placed without a location. */
   delivery_fee_estimate?: number | null;
+  /** Postal-code delivery quote (src/lib/delivery-quote.ts); null on orders placed before it. */
+  customer_postal_code?: string | null;
+  delivery_type?: string | null;
+  delivery_distance_km?: number | null;
   order_status: string;
   payment_status: string;
   preparation_status: string;
@@ -272,6 +277,8 @@ export default async function OrderConfirmationPage({
 
   const deliveryFee = order.delivery_fee_estimate ?? null;
   const total = order.subtotal + (deliveryFee ?? 0);
+  const deliveryTypeLabel = isDeliveryType(order.delivery_type) ? DELIVERY_TYPE_LABEL[order.delivery_type] : null;
+  const deliveryDistanceKm = order.delivery_distance_km != null ? Number(order.delivery_distance_km) : null;
 
   // Pay-and-upload card once the cook accepts. Uploading needs a signed-in
   // customer; without one the old one-line payment message stays.
@@ -371,6 +378,24 @@ export default async function OrderConfirmationPage({
               <span className="font-semibold">Subtotal</span>
               <span className="font-semibold">${order.subtotal.toFixed(2)}</span>
             </div>
+            {deliveryTypeLabel && (
+              <div data-testid="order-delivery-type" className="flex items-center justify-between text-sm" style={{ color: "var(--kb-ink-soft)" }}>
+                <span>Delivery</span>
+                <span>{deliveryTypeLabel}</span>
+              </div>
+            )}
+            {order.customer_postal_code && (
+              <div data-testid="order-postal-code" className="flex items-center justify-between text-sm" style={{ color: "var(--kb-ink-soft)" }}>
+                <span>Delivery postal code</span>
+                <span>{order.customer_postal_code}</span>
+              </div>
+            )}
+            {deliveryDistanceKm != null && Number.isFinite(deliveryDistanceKm) && (
+              <div data-testid="order-distance" className="flex items-center justify-between text-sm" style={{ color: "var(--kb-ink-soft)" }}>
+                <span>Distance</span>
+                <span>about {deliveryDistanceKm.toFixed(1)} km</span>
+              </div>
+            )}
             {deliveryFee != null && (
               <div className="flex items-center justify-between text-sm" style={{ color: "var(--kb-ink-soft)" }}>
                 <span>Estimated delivery fee</span>

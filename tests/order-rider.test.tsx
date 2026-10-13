@@ -285,10 +285,34 @@ describe("/orders/[id] — rating + totals", () => {
   });
 
   it("breaks out Subtotal, the estimated delivery fee and Total", async () => {
-    const { container } = await renderPage(order({ subtotal: 12.5, delivery_fee_estimate: 3 }), [accepted]);
+    const { container } = await renderPage(order({ subtotal: 12.5, delivery_fee_estimate: 2.8 }), [accepted]);
     expect(container).toHaveTextContent("Subtotal$12.50");
-    expect(container).toHaveTextContent("Estimated delivery fee$3.00");
-    expect(within(container).getByTestId("order-total")).toHaveTextContent("Total$15.50");
+    expect(container).toHaveTextContent("Estimated delivery fee$2.80");
+    expect(within(container).getByTestId("order-total")).toHaveTextContent("Total$15.30");
+  });
+
+  it("shows the delivery type, the customer's postal code and the distance", async () => {
+    const { container } = await renderPage(
+      order({
+        subtotal: 12.5,
+        delivery_fee_estimate: 5.5,
+        delivery_type: "express",
+        customer_postal_code: "310123",
+        delivery_distance_km: 5.04,
+      }),
+      [accepted]
+    );
+    expect(within(container).getByTestId("order-delivery-type")).toHaveTextContent("DeliveryExpress");
+    expect(within(container).getByTestId("order-postal-code")).toHaveTextContent("Delivery postal code310123");
+    expect(within(container).getByTestId("order-distance")).toHaveTextContent("Distanceabout 5.0 km");
+    expect(within(container).getByTestId("order-total")).toHaveTextContent("Total$18.00");
+  });
+
+  it("leaves out type, postal code and distance on older orders without them", async () => {
+    const { container } = await renderPage(order({ delivery_fee_estimate: 3 }), [accepted]);
+    expect(within(container).queryByTestId("order-delivery-type")).toBeNull();
+    expect(within(container).queryByTestId("order-postal-code")).toBeNull();
+    expect(within(container).queryByTestId("order-distance")).toBeNull();
   });
 
   it("Total equals Subtotal when there's no delivery fee estimate", async () => {

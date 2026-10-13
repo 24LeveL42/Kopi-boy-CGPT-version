@@ -1,59 +1,54 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import { haversineDistanceKm, estimateDeliveryFee } from "@/lib/distance";
+import { quoteDeliveryForPostalCode } from "@/lib/delivery-quote";
+import { deliveryQuoteMessage, isDeliveryType, type DeliveryType } from "@/lib/delivery-types";
+
+export type PlaceOrderResult = { ok: true; orderId: string } | { ok: false; message: string };
 
 /**
  * Places an order from the client's cart. Re-fetches real menu_items prices
  * and computes the subtotal itself here — never trust a client-supplied
  * price or total, since this is called directly from client cart state.
- * delivery_fee_estimate gets the same treatment: it's recomputed here from
- * the kitchen's own latitude/longitude and the customer-supplied coordinates
- * (just a location, not a price — but centralizing the formula here avoids
- * any client/server mismatch), never taken as a number from the client.
  *
- * `location` is optional and one-time — captured client-side via
- * navigator.geolocation (see src/lib/use-customer-location.ts), not a live
- * profile field. Declining it (or an unsupported browser) never blocks
- * placing an order; it just leaves customer_lat/lng and
- * delivery_fee_estimate null.
+ * The delivery fee gets the same treatment: the client sends only the
+ * delivery postal code and Normal/Express. This geocodes the postal code and
+ * calls the quote_delivery RPC (src/lib/delivery-quote.ts) — no fee or
+ * coordinates are ever taken from the client. If the fee can't be worked out
+ * (lookup down, kitchen has no location yet, unknown postal code) no order
+ * is created.
  *
- * Returns the new order id rather than calling redirect() itself: this is
- * invoked from inside a client-side try/catch (to surface errors on the
- * button), and redirect() throws internally, which a wrapping catch would
- * swallow as a failure. The caller navigates after a successful return.
+ * Returns a result object rather than throwing, for the same reason as
+ * cancelOrder() below (thrown messages are redacted in production), and
+ * returns the new order id rather than calling redirect() itself — the
+ * caller navigates after a successful return.
  */
 export async function placeOrder(
   kitchenId: string,
   items: { menuItemId: string; quantity: number }[],
-  location?: { latitude: number; longitude: number } | null
-): Promise<{ orderId: string }> {
-  if (items.length === 0) throw new Error("Your cart is empty.");
+  delivery: { postalCode: string; deliveryType: DeliveryType }
+): Promise<PlaceOrderResult> {
+  if (items.length === 0) return { ok: false, message: "Your cart is empty." };
   for (const item of items) {
     if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
-      throw new Error("Invalid item quantity in cart.");
+      return { ok: false, message: "Invalid item quantity in cart." };
     }
   }
+  const postalCode = String(delivery?.postalCode ?? "").trim();
+  if (!/^\d{6}$/.test(postalCode)) return { ok: false, message: "Enter a 6-digit delivery postal code." };
+  if (!isDeliveryType(delivery?.deliveryType)) return { ok: false, message: "Choose Normal or Express delivery." };
 
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) throw new Error("Please sign in to place an order.");
+  if (!user) return { ok: false, message: "Please sign in to place an order." };
 
-  const { data: kitchen } = await supabase
-    .from("kitchens")
-    .select("id, is_live, latitude, longitude")
-    .eq("id", kitchenId)
-    .maybeSingle();
-  if (!kitchen || !kitchen.is_live) throw new Error("This kitchen isn't accepting orders right now.");
+  const { data: kitchen } = await supabase.from("kitchens").select("id, is_live").eq("id", kitchenId).maybeSingle();
+  if (!kitchen || !kitchen.is_live) return { ok: false, message: "This kitchen isn't accepting orders right now." };
 
-  const deliveryFeeEstimate =
-    location && kitchen.latitude != null && kitchen.longitude != null
-      ? estimateDeliveryFee(
-          haversineDistanceKm(location.latitude, location.longitude, kitchen.latitude, kitchen.longitude)
-        )
-      : null;
+  const quote = await quoteDeliveryForPostalCode(supabase, kitchenId, postalCode, delivery.deliveryType);
+  if (!quote.ok) return { ok: false, message: deliveryQuoteMessage(quote.reason) };
 
   const { data: menuItems, error: menuError } = await supabase
     .from("menu_items")
@@ -63,14 +58,15 @@ export async function placeOrder(
       "id",
       items.map((i) => i.menuItemId)
     );
-  if (menuError) throw new Error(`Couldn't load menu: ${menuError.message}`);
+  if (menuError) return { ok: false, message: `Couldn't load menu: ${menuError.message}` };
 
   const menuById = new Map((menuItems ?? []).map((m) => [m.id, m]));
-  const orderItems = items.map((i) => {
+  const orderItems = [];
+  for (const i of items) {
     const menuItem = menuById.get(i.menuItemId);
-    if (!menuItem) throw new Error("One of the items in your cart is no longer available.");
-    return { menu_item_id: menuItem.id, name: menuItem.name, price: menuItem.price, quantity: i.quantity };
-  });
+    if (!menuItem) return { ok: false, message: "One of the items in your cart is no longer available." };
+    orderItems.push({ menu_item_id: menuItem.id, name: menuItem.name, price: menuItem.price, quantity: i.quantity });
+  }
 
   const subtotal = orderItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
 
@@ -80,20 +76,23 @@ export async function placeOrder(
       customer_id: user.id,
       kitchen_id: kitchenId,
       subtotal,
-      customer_lat: location?.latitude ?? null,
-      customer_lng: location?.longitude ?? null,
-      delivery_fee_estimate: deliveryFeeEstimate,
+      customer_postal_code: postalCode,
+      customer_lat: quote.lat,
+      customer_lng: quote.lng,
+      delivery_type: delivery.deliveryType,
+      delivery_distance_km: quote.distanceKm,
+      delivery_fee_estimate: quote.fee,
     })
     .select("id")
     .single();
-  if (orderError) throw new Error(`Couldn't place order: ${orderError.message}`);
+  if (orderError) return { ok: false, message: `Couldn't place order: ${orderError.message}` };
 
   const { error: itemsError } = await supabase
     .from("order_items")
     .insert(orderItems.map((i) => ({ ...i, order_id: order.id })));
-  if (itemsError) throw new Error(`Couldn't save order items: ${itemsError.message}`);
+  if (itemsError) return { ok: false, message: `Couldn't save order items: ${itemsError.message}` };
 
-  return { orderId: order.id };
+  return { ok: true, orderId: order.id };
 }
 
 export type CancelOrderResult = { ok: true } | { ok: false; message: string };
