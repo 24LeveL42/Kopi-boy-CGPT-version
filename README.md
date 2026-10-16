@@ -39,6 +39,10 @@ Done:
   inbox, driven by Supabase Realtime; the order page also updates live instead
   of polling (see `docs/notifications.md`; needs the last section of
   `docs/supabase-schema.sql` run once)
+- Push notifications for order updates (works with the app closed) — needs
+  VAPID keys, Vercel env vars, `docs/supabase-customer-push.sql` and one
+  `update` for the webhook URL; exact steps in
+  [`docs/customer-push.md`](./docs/customer-push.md)
 - Testing — Vitest + Testing Library (search/filter logic, order status,
   cancellation, notifications + Realtime behaviour)
 

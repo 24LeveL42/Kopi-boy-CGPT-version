@@ -4,6 +4,7 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Spinner } from "@/components/Spinner";
+import { removeDeviceSubscription } from "@/lib/push-client";
 
 export function SignOutButton() {
   const supabase = createClient();
@@ -12,6 +13,8 @@ export function SignOutButton() {
 
   function handleSignOut() {
     startTransition(async () => {
+      // While still signed in: RLS only lets the owner delete the subscription.
+      await removeDeviceSubscription(supabase);
       await supabase.auth.signOut();
       router.push("/");
       router.refresh();

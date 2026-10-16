@@ -12,6 +12,7 @@ import { ORDER_CHAT_PHOTO_BUCKET, ORDER_CHAT_PHOTO_URL_TTL_SECONDS, type Message
 import { SupportChatToggle } from "@/components/SupportChat";
 import { OrderRating, RateOrder } from "@/components/RateOrder";
 import { PaymentProofCard } from "@/components/PaymentProofCard";
+import { PushPrompt } from "@/components/PushNotifications";
 import {
   PAYMENT_PROOF_BUCKET,
   PAYMENT_PROOF_URL_TTL_SECONDS,
@@ -332,6 +333,8 @@ export default async function OrderConfirmationPage({
               {stageTimestamp}
             </p>
           )}
+          {/* After the first order, never on a first visit: this page only exists once one is placed. */}
+          {user && !header.failed && <PushPrompt />}
           {rider && <RiderCard rider={rider} />}
           {liveDeliveryRequestId && <RiderLocationMap deliveryRequestId={liveDeliveryRequestId} />}
           {proofPhotoUrl && (
