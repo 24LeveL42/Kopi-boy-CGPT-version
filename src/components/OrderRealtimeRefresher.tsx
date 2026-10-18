@@ -9,8 +9,9 @@ import { createClient } from "@/lib/supabase/client";
  * status once, at request time — so an already-open tab needs telling when
  * the cook/rider acts. This subscribes to Supabase Realtime for this one
  * order (its `orders` row and its `delivery_requests` rows) and calls
- * `router.refresh()` the moment either changes — replacing the old
- * OrderStatusPoller's 5-second polling. RLS means the customer only receives
+ * `router.refresh()` the moment either changes (including the rider marking
+ * the food collected, which only sets delivery_requests.picked_up_at) —
+ * replacing the old OrderStatusPoller's 5-second polling. RLS means the customer only receives
  * changes to their own order. Unsubscribes once the order is settled.
  *
  * Safety net: if the channel can't be established (Realtime down, or the

@@ -1,10 +1,12 @@
 import type { ReactNode } from "react";
 
 /**
- * Where the order sits along the 4-stage happy path, in stage units:
- * -1 = nothing reached yet (still waiting on the kitchen), 0..3 = that stage's
+ * Where the order sits along the 5-stage happy path, in stage units:
+ * -1 = nothing reached yet (still waiting on the kitchen), 0..4 = that stage's
  * index, and 1.5 = "ready" — food is done but no rider yet, so the line runs
- * half-way from Preparing toward Rider. `null` means a terminal failure
+ * half-way from Preparing toward the rider. The rider has two steps: 2 =
+ * heading to the kitchen (delivery accepted), 3 = food collected and on the
+ * way to the customer (delivery_requests.picked_up_at set). `null` means a terminal failure
  * (cancelled / rejected), which has no place on the happy path at all —
  * the bar renders nothing and the page header shows the failure instead.
  *
@@ -51,7 +53,17 @@ const STEPS: Step[] = [
     ),
   },
   {
-    label: "Rider on the way",
+    label: "Rider picking up",
+    icon: (
+      <svg {...ICON_PROPS}>
+        <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
+        <path d="M3 6h18" />
+        <path d="M16 10a4 4 0 0 1-8 0" />
+      </svg>
+    ),
+  },
+  {
+    label: "On the way to you",
     icon: (
       <svg {...ICON_PROPS}>
         <circle cx="5" cy="18" r="3" />
@@ -115,7 +127,7 @@ export function OrderProgress({ position }: { position: ProgressPosition }) {
           fill grows over it. Icons sit above (z-10) so they cover the ends. */}
       <div
         aria-hidden
-        className="absolute left-[12.5%] right-[12.5%] top-5 h-1 -translate-y-1/2 rounded-full"
+        className="absolute left-[10%] right-[10%] top-5 h-1 -translate-y-1/2 rounded-full"
         style={{ background: TRACK_COLOR }}
       >
         <div

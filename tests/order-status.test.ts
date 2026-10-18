@@ -48,8 +48,31 @@ describe("getStage", () => {
     const acceptedAt = "2026-01-01T00:25:00.000Z";
     const delivery: DeliveryRequestRow = { status: "accepted", accepted_at: acceptedAt, completed_at: null };
     const stage = getStage(order({ order_status: "accepted", preparation_status: "ready" }), delivery);
-    expect(stage.message).toBe("A rider has been assigned and is on the way to pick up your order");
+    expect(stage.message).toBe("Rider is on the way to pick up your food");
     expect(stage.at).toBe(acceptedAt);
+  });
+
+  it("treats an accepted delivery with picked_up_at null or missing as not yet collected", () => {
+    for (const picked_up_at of [null, undefined]) {
+      const delivery: DeliveryRequestRow = { status: "accepted", accepted_at: "t", completed_at: null, picked_up_at };
+      expect(getStage(order({ order_status: "accepted", preparation_status: "ready" }), delivery).message).toBe(
+        "Rider is on the way to pick up your food"
+      );
+    }
+  });
+
+  it("shows the collected message once the rider has picked up (status stays accepted), timestamped at picked_up_at", () => {
+    const pickedUpAt = "2026-01-01T00:32:00.000Z";
+    const delivery: DeliveryRequestRow = { status: "accepted", accepted_at: "2026-01-01T00:25:00.000Z", completed_at: null, picked_up_at: pickedUpAt };
+    const stage = getStage(order({ order_status: "accepted", preparation_status: "ready" }), delivery);
+    expect(stage.message).toBe("Rider has collected your food and is on the way to you");
+    expect(stage.at).toBe(pickedUpAt);
+    expect(stage.tone).toBe("success");
+  });
+
+  it("still says cancelled when a picked-up delivery lingers on a cancelled order", () => {
+    const delivery: DeliveryRequestRow = { status: "accepted", accepted_at: "t", completed_at: null, picked_up_at: "t2" };
+    expect(getStage(order({ order_status: "cancelled" }), delivery).message).toBe("Order was cancelled");
   });
 
   it("shows 'Delivered' once a delivery request is completed", () => {
@@ -87,8 +110,10 @@ describe("getStage progress-bar position", () => {
     expect(getStage(order({ ...accepted, preparation_status: "ready" }), null).position).toBe(1.5);
     const riderAccepted: DeliveryRequestRow = { status: "accepted", accepted_at: "t", completed_at: null };
     expect(getStage(order({ ...accepted, preparation_status: "ready" }), riderAccepted).position).toBe(2);
-    const riderDone: DeliveryRequestRow = { status: "completed", accepted_at: "t", completed_at: "t2" };
-    expect(getStage(order({ ...accepted, preparation_status: "ready" }), riderDone).position).toBe(3);
+    const riderPickedUp: DeliveryRequestRow = { status: "accepted", accepted_at: "t", completed_at: null, picked_up_at: "t1" };
+    expect(getStage(order({ ...accepted, preparation_status: "ready" }), riderPickedUp).position).toBe(3);
+    const riderDone: DeliveryRequestRow = { status: "completed", accepted_at: "t", completed_at: "t2", picked_up_at: "t1" };
+    expect(getStage(order({ ...accepted, preparation_status: "ready" }), riderDone).position).toBe(4);
     expect(getStage(order({ order_status: "cancelled" }), null).position).toBeNull();
     expect(getStage(order({ order_status: "rejected" }), null).position).toBeNull();
   });

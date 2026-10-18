@@ -2,7 +2,8 @@
  * Order-update Web Push: which events send a push, and what it says.
  *
  * The events are decided in the database (docs/supabase-customer-push.sql —
- * the triggers on orders / delivery_requests) and POSTed to
+ * the triggers on orders / delivery_requests — plus the Partner app's
+ * pickup trigger for order_picked_up) and POSTed to
  * /api/push/order-update, which maps them to the wording below. The payload is
  * deliberately generic: no kitchen name, address, phone, amount or PayNow
  * details — only a short title, one line, and the order's own page.
@@ -14,6 +15,7 @@ export const ORDER_PUSH_EVENTS = [
   "payment_received",
   "payment_not_received",
   "rider_on_the_way",
+  "order_picked_up",
   "order_delivered",
 ] as const;
 
@@ -30,9 +32,14 @@ export const ORDER_PUSH_MESSAGES: Record<OrderPushEvent, { title: string; body: 
     title: "Payment not received",
     body: "Your payment wasn't received. Please check and send your proof again.",
   },
-  // There is no "picked up" state: delivery_requests.status = 'accepted' means
-  // a rider took the job and is heading to the kitchen.
+  // delivery_requests.status = 'accepted': a rider took the job and is heading to the kitchen.
   rider_on_the_way: { title: "Rider on the way", body: "A rider is on the way to pick up your order." },
+  // Sent by the Partner app when the rider marks the food collected
+  // (delivery_requests.picked_up_at; status stays 'accepted'). ref = rider.
+  order_picked_up: {
+    title: "Your food is on the way",
+    body: "Your rider has collected your food and is on the way to deliver it.",
+  },
   order_delivered: { title: "Order delivered", body: "Your order was delivered. Enjoy!" },
 };
 

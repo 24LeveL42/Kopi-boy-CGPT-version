@@ -60,6 +60,12 @@ export interface DeliveryRequestRow {
   status: string;
   accepted_at: string | null;
   completed_at: string | null;
+  /**
+   * Set by the Partner app when the rider taps "I've collected the food"
+   * (its docs/supabase-delivery-pickup.sql). status stays 'accepted', so
+   * "picked up" = accepted + this set. Absent where that column doesn't exist.
+   */
+  picked_up_at?: string | null;
 }
 
 export interface Stage {
@@ -86,7 +92,8 @@ export function pickActiveDelivery(deliveries: DeliveryRequestRow[]): DeliveryRe
 /**
  * Maps order_status/preparation_status/delivery_requests to the single-line
  * stage message + timestamp the customer sees, per the locked stage list:
- * placed -> accepted+preparing -> ready -> rider assigned -> delivered, with
+ * placed -> accepted+preparing -> ready -> rider assigned -> food collected
+ * -> delivered, with
  * cancelled/rejected as terminal branches off of "placed". These stay
  * separate DB columns (locked business rule, docs/feature-001.md) but the
  * customer just wants one clear sentence and a "since when".
@@ -99,11 +106,19 @@ export function getStage(order: OrderRow, activeDelivery: DeliveryRequestRow | n
     return { message: "Order was rejected", at: order.decided_at, tone: "danger", position: null };
   }
   if (activeDelivery?.status === "completed") {
-    return { message: "Delivered", at: activeDelivery.completed_at, tone: "success", position: 3 };
+    return { message: "Delivered", at: activeDelivery.completed_at, tone: "success", position: 4 };
+  }
+  if (activeDelivery?.status === "accepted" && activeDelivery.picked_up_at) {
+    return {
+      message: "Rider has collected your food and is on the way to you",
+      at: activeDelivery.picked_up_at,
+      tone: "success",
+      position: 3,
+    };
   }
   if (activeDelivery?.status === "accepted") {
     return {
-      message: "A rider has been assigned and is on the way to pick up your order",
+      message: "Rider is on the way to pick up your food",
       at: activeDelivery.accepted_at,
       tone: "success",
       position: 2,
@@ -209,9 +224,15 @@ export default async function OrderConfirmationPage({
       .eq("id", order.kitchen_id)
       .maybeSingle<{ business_name: string; paynow_type: string | null; paynow_value: string | null }>(),
     supabase.from("order_items").select("id, name, price, quantity").eq("order_id", id).order("id").returns<OrderItemRow[]>(),
+    // "*" (same reason as the orders query above): picked_up_at only exists
+    // once the Partner's pickup migration has run, and naming it would fail
+    // the whole query on a project without it. The existing "Customers can
+    // read delivery requests for their own orders" policy (schema §20)
+    // scopes these rows to this customer's order; nothing here goes to the
+    // browser except the stage it renders.
     supabase
       .from("delivery_requests")
-      .select("status, accepted_at, completed_at")
+      .select("*")
       .eq("order_id", id)
       .order("created_at", { ascending: false })
       .returns<DeliveryRequestRow[]>(),

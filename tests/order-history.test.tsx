@@ -98,6 +98,18 @@ describe("/orders — order history", () => {
     expect(items[1]).toHaveTextContent("Order was cancelled");
   });
 
+  it("reads delivery_requests with * (so picked_up_at comes through) and tells collected apart from heading to the kitchen", async () => {
+    db.rows = [
+      row({ id: "o2", order_status: "accepted", preparation_status: "ready", delivery_requests: [{ status: "accepted", accepted_at: "t", completed_at: null, picked_up_at: "t1" }] }),
+      row({ id: "o1", order_status: "accepted", preparation_status: "ready", delivery_requests: [{ status: "accepted", accepted_at: "t", completed_at: null, picked_up_at: null }] }),
+    ];
+    await renderPage();
+    expect(db.queries[0]).toContainEqual(["select", "*, kitchens(business_name), delivery_requests(*)"]);
+    const items = screen.getAllByTestId("order-history-row");
+    expect(items[0]).toHaveTextContent("Rider has collected your food and is on the way to you");
+    expect(items[1]).toHaveTextContent("Rider is on the way to pick up your food");
+  });
+
   it("shows the scheduled delivery time, and nothing extra for as-soon-as-possible orders", async () => {
     db.rows = [row({ id: "o2", scheduled_for: "2026-09-21T10:30:00.000Z" }), row({ id: "o1" })];
     await renderPage();

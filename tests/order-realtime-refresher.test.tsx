@@ -47,6 +47,17 @@ describe("OrderRealtimeRefresher (replaces OrderStatusPoller)", () => {
     expect(router.refresh).toHaveBeenCalledTimes(2);
   });
 
+  it("refreshes when the rider marks the food collected (only picked_up_at changes, status stays accepted)", () => {
+    const { channel } = setup();
+    act(() => channel.setStatus("SUBSCRIBED"));
+    router.refresh.mockClear();
+
+    act(() =>
+      channel.emit("UPDATE", "delivery_requests", { order_id: "order-7", status: "accepted", picked_up_at: "2026-10-19T04:12:00.000Z" })
+    );
+    expect(router.refresh).toHaveBeenCalledTimes(1);
+  });
+
   it("does NOT poll while the channel is healthy", () => {
     const { channel } = setup();
     act(() => channel.setStatus("SUBSCRIBED"));

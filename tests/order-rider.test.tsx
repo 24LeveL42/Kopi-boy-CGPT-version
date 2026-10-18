@@ -135,6 +135,14 @@ describe("/orders/[id] — rider card", () => {
     expect(map).toHaveAttribute("data-delivery-request-id", "dr-1");
   });
 
+  it("keeps the rider card and live map after pickup (status stays accepted)", async () => {
+    db.activeDeliveryId = "dr-1";
+    const { container } = await renderPage(order(), [{ ...accepted, picked_up_at: "2026-01-01T00:32:00.000Z" }]);
+    expect(within(container).getByText("Rider has collected your food and is on the way to you", { selector: "p" })).toBeInTheDocument();
+    expect(within(container).getByTestId("rider-card")).toBeInTheDocument();
+    expect(within(container).getByTestId("rider-location-map")).toHaveAttribute("data-delivery-request-id", "dr-1");
+  });
+
   it("shows no live map when get_order_active_delivery returns null", async () => {
     const { container } = await renderPage(order(), [accepted]);
     expect(within(container).queryByTestId("rider-location-map")).toBeNull();
@@ -204,7 +212,7 @@ describe("/orders/[id] — rider card", () => {
     for (const data of [null, []]) {
       const { container } = await renderPage(order(), [accepted], data);
       expect(within(container).queryByTestId("rider-card")).toBeNull();
-      expect(within(container).getByText("A rider has been assigned and is on the way to pick up your order", { selector: "p" })).toBeInTheDocument();
+      expect(within(container).getByText("Rider is on the way to pick up your food", { selector: "p" })).toBeInTheDocument();
       expect(within(container).getByRole("heading", { level: 1 })).toHaveTextContent("Order placed!");
       cleanup();
     }

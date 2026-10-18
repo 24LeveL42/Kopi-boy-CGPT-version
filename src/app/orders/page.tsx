@@ -42,12 +42,13 @@ export default async function OrdersPage() {
   let loadFailed = false;
   if (user) {
     // "*" for the same reason as the order page (tolerates not-yet-migrated
-    // columns). kitchens is null when the kitchen has since gone offline
-    // (kitchens RLS only shows live ones to customers).
+    // columns, e.g. delivery_requests.picked_up_at). kitchens is null when
+    // the kitchen has since gone offline (kitchens RLS only shows live ones
+    // to customers).
     const query = () =>
       supabase
         .from("orders")
-        .select("*, kitchens(business_name), delivery_requests(status, accepted_at, completed_at)")
+        .select("*, kitchens(business_name), delivery_requests(*)")
         .eq("customer_id", user.id)
         .order("created_at", { ascending: false })
         .limit(ORDER_HISTORY_LIMIT);

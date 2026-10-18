@@ -190,6 +190,9 @@ revoke all on function private.send_customer_order_push(uuid, text, text) from p
 -- delivery_requests (the rider lives here, not on orders):
 --   status -> 'accepted'                         rider_on_the_way (ref = rider)
 --   status -> 'completed'                        order_delivered
+--   picked_up_at set                             order_picked_up (ref = rider)
+--     ^ sent by the Partner app's own trigger (its docs/supabase-delivery-
+--       pickup.sql) through send_customer_order_push above, not from here.
 -- Nothing else sends a push.
 --
 -- payment_proof_rejected_at is read through to_jsonb(...) so this works (and

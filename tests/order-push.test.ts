@@ -115,6 +115,7 @@ describe("event → message mapping", () => {
     ["payment_received", "Payment received. Your food is being prepared."],
     ["payment_not_received", "Your payment wasn't received. Please check and send your proof again."],
     ["rider_on_the_way", "A rider is on the way to pick up your order."],
+    ["order_picked_up", "Your rider has collected your food and is on the way to deliver it."],
     ["order_delivered", "Your order was delivered. Enjoy!"],
   ])("%s says the agreed line and links to the order", (event, body) => {
     const payload = buildOrderPushPayload(event, ORDER_ID);
@@ -126,10 +127,28 @@ describe("event → message mapping", () => {
     });
   });
 
-  it("covers exactly the six push events", () => {
+  it("covers exactly the seven push events", () => {
     expect([...ORDER_PUSH_EVENTS].sort()).toEqual(
-      ["order_accepted", "order_cancelled", "order_delivered", "payment_not_received", "payment_received", "rider_on_the_way"].sort()
+      [
+        "order_accepted",
+        "order_cancelled",
+        "order_delivered",
+        "order_picked_up",
+        "payment_not_received",
+        "payment_received",
+        "rider_on_the_way",
+      ].sort()
     );
+  });
+
+  it("titles the pickup push 'Your food is on the way' and leaves the rider_on_the_way wording alone", () => {
+    expect(buildOrderPushPayload("order_picked_up", ORDER_ID)).toEqual({
+      title: "Your food is on the way",
+      body: "Your rider has collected your food and is on the way to deliver it.",
+      url: `/orders/${ORDER_ID}`,
+      tag: `order-${ORDER_ID}`,
+    });
+    expect(buildOrderPushPayload("rider_on_the_way", ORDER_ID)?.body).toBe("A rider is on the way to pick up your order.");
   });
 
   it("sends nothing for any other change", () => {
@@ -180,6 +199,15 @@ describe("POST /api/push/order-update — authentication", () => {
     expect(res.status).toBe(503);
   });
 
+  it("refuses order_picked_up with a wrong secret, like every other event", async () => {
+    const { client } = createFakeAdmin({ subs: [sub("s1")] });
+    const { deps, createAdmin, send } = makeDeps(client);
+    const res = await handleOrderPushWebhook(webhook({ order_id: ORDER_ID, event: "order_picked_up", ref: "rider-1" }, "wrong-secret"), deps);
+    expect(res.status).toBe(401);
+    expect(createAdmin).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalled();
+  });
+
   it("rejects an unknown event even with the right secret", async () => {
     const { client } = createFakeAdmin({ subs: [sub("s1")] });
     const { deps, send } = makeDeps(client);
@@ -223,6 +251,50 @@ describe("POST /api/push/order-update — sending", () => {
       url: `/orders/${ORDER_ID}`,
       tag: `order-${ORDER_ID}`,
     });
+  });
+});
+
+describe("POST /api/push/order-update — order_picked_up", () => {
+  it("pushes the pickup line to the order's own customer only", async () => {
+    const { client } = createFakeAdmin({ subs: [sub("s1"), sub("other", "someone-else")] });
+    const send = vi.fn<OrderPushDeps["send"]>(async () => ({}));
+    const { deps } = makeDeps(client, send);
+
+    const res = await handleOrderPushWebhook(webhook({ order_id: ORDER_ID, event: "order_picked_up", ref: "rider-1" }), deps);
+
+    expect(await res.json()).toMatchObject({ subscriptions: 1, sent: 1 });
+    expect(send.mock.calls.map(([t]) => t.endpoint)).toEqual(["https://push.example.com/s1"]);
+    expect(JSON.parse(send.mock.calls[0][1])).toEqual({
+      title: "Your food is on the way",
+      body: "Your rider has collected your food and is on the way to deliver it.",
+      url: `/orders/${ORDER_ID}`,
+      tag: `order-${ORDER_ID}`,
+    });
+  });
+
+  it("sends nothing for an order that doesn't exist", async () => {
+    const { client } = createFakeAdmin({ subs: [sub("s1")], orderCustomer: null });
+    const { deps, send } = makeDeps(client);
+    await handleOrderPushWebhook(webhook({ order_id: ORDER_ID, event: "order_picked_up", ref: "rider-1" }), deps);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("sends the same pickup once, but again when a new rider collects after a release", async () => {
+    const { client } = createFakeAdmin({ subs: [sub("s1")] });
+    const { deps, send } = makeDeps(client);
+
+    const first = await handleOrderPushWebhook(webhook({ order_id: ORDER_ID, event: "order_picked_up", ref: "rider-1" }), deps);
+    const repeat = await handleOrderPushWebhook(webhook({ order_id: ORDER_ID, event: "order_picked_up", ref: "rider-1" }), deps);
+    const newRider = await handleOrderPushWebhook(webhook({ order_id: ORDER_ID, event: "order_picked_up", ref: "rider-2" }), deps);
+
+    expect(await first.json()).toMatchObject({ sent: 1 });
+    expect(await repeat.json()).toEqual({ duplicate: true });
+    expect(await newRider.json()).toMatchObject({ sent: 1 });
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+
+  it("doesn't collide with rider_on_the_way for the same rider", () => {
+    expect(orderPushDedupeKey(ORDER_ID, "order_picked_up", "rider-1")).not.toBe(orderPushDedupeKey(ORDER_ID, "rider_on_the_way", "rider-1"));
   });
 });
 

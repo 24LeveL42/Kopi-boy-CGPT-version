@@ -60,7 +60,13 @@ function order(overrides: Partial<OrderRow> = {}): OrderRow {
 
 const ACCEPTED = { order_status: "accepted", decided_at: "2026-01-01T00:05:00.000Z" } as const;
 const riderAccepted: DeliveryRequestRow = { status: "accepted", accepted_at: "2026-01-01T00:25:00.000Z", completed_at: null };
-const riderCompleted: DeliveryRequestRow = { status: "completed", accepted_at: "2026-01-01T00:25:00.000Z", completed_at: "2026-01-01T00:40:00.000Z" };
+const riderPickedUp: DeliveryRequestRow = { ...riderAccepted, picked_up_at: "2026-01-01T00:32:00.000Z" };
+const riderCompleted: DeliveryRequestRow = {
+  status: "completed",
+  accepted_at: "2026-01-01T00:25:00.000Z",
+  completed_at: "2026-01-01T00:40:00.000Z",
+  picked_up_at: "2026-01-01T00:32:00.000Z",
+};
 
 type StepStates = string[];
 
@@ -80,7 +86,7 @@ const SCENARIOS: Scenario[] = [
     name: "placed",
     order: order(),
     deliveries: [],
-    steps: ["upcoming", "upcoming", "upcoming", "upcoming"],
+    steps: ["upcoming", "upcoming", "upcoming", "upcoming", "upcoming"],
     fill: "0%",
     message: "Waiting for kitchen to accept",
   },
@@ -88,47 +94,55 @@ const SCENARIOS: Scenario[] = [
     name: "accepted + not_started",
     order: order({ ...ACCEPTED }),
     deliveries: [],
-    steps: ["done", "current", "upcoming", "upcoming"],
-    fill: "33.33",
+    steps: ["done", "current", "upcoming", "upcoming", "upcoming"],
+    fill: "25%",
     message: "Order confirmed — cook is preparing your food",
   },
   {
     name: "accepted + preparing",
     order: order({ ...ACCEPTED, preparation_status: "preparing" }),
     deliveries: [],
-    steps: ["done", "current", "upcoming", "upcoming"],
-    fill: "33.33",
+    steps: ["done", "current", "upcoming", "upcoming", "upcoming"],
+    fill: "25%",
     message: "Order confirmed — cook is preparing your food",
   },
   {
     name: "ready (no rider yet)",
     order: order({ ...ACCEPTED, preparation_status: "ready", ready_at: "2026-01-01T00:20:00.000Z" }),
     deliveries: [{ status: "open", accepted_at: null, completed_at: null }],
-    steps: ["done", "done", "upcoming", "upcoming"],
-    fill: "50%",
+    steps: ["done", "done", "upcoming", "upcoming", "upcoming"],
+    fill: "37.5%",
     message: "Ready — looking for a rider",
   },
   {
     name: "rider released back to open",
     order: order({ ...ACCEPTED, preparation_status: "ready", ready_at: "2026-01-01T00:20:00.000Z" }),
     deliveries: [{ status: "release_requested", accepted_at: "2026-01-01T00:22:00.000Z", completed_at: null }],
-    steps: ["done", "done", "upcoming", "upcoming"],
-    fill: "50%",
+    steps: ["done", "done", "upcoming", "upcoming", "upcoming"],
+    fill: "37.5%",
     message: "Ready — looking for a rider",
   },
   {
     name: "rider assigned",
     order: order({ ...ACCEPTED, preparation_status: "ready", ready_at: "2026-01-01T00:20:00.000Z" }),
     deliveries: [riderAccepted],
-    steps: ["done", "done", "current", "upcoming"],
-    fill: "66.66",
-    message: "A rider has been assigned and is on the way to pick up your order",
+    steps: ["done", "done", "current", "upcoming", "upcoming"],
+    fill: "50%",
+    message: "Rider is on the way to pick up your food",
+  },
+  {
+    name: "rider collected the food (status still accepted)",
+    order: order({ ...ACCEPTED, preparation_status: "ready", ready_at: "2026-01-01T00:20:00.000Z" }),
+    deliveries: [riderPickedUp],
+    steps: ["done", "done", "done", "current", "upcoming"],
+    fill: "75%",
+    message: "Rider has collected your food and is on the way to you",
   },
   {
     name: "delivered",
     order: order({ ...ACCEPTED, preparation_status: "ready", ready_at: "2026-01-01T00:20:00.000Z" }),
     deliveries: [riderCompleted],
-    steps: ["done", "done", "done", "done"],
+    steps: ["done", "done", "done", "done", "done"],
     fill: "100%",
     message: "Delivered",
   },
@@ -208,7 +222,8 @@ describe("/orders/[id] progress bar — every state, through the real page", () 
       expect(items.map((li) => li.textContent?.split(",")[0])).toEqual([
         "Order accepted",
         "Preparing",
-        "Rider on the way",
+        "Rider picking up",
+        "On the way to you",
         "Delivered",
       ]);
 
@@ -236,13 +251,13 @@ describe("bar fill follows the stage at every transition", () => {
   afterEach(cleanup);
 
   it("never moves backwards along the real happy path, and each step turns green exactly once", () => {
-    // placed -> accepted/preparing -> ready -> rider assigned -> delivered
-    const positions = [-1, 1, 1.5, 2, 3];
+    // placed -> accepted/preparing -> ready -> rider assigned -> collected -> delivered
+    const positions = [-1, 1, 1.5, 2, 3, 4];
     let lastFill = -1;
     let lastGreen = -1;
     for (const p of positions) {
       const fill = getLineFill(p);
-      const green = [0, 1, 2, 3].filter((i) => getStepState(i, p) !== "upcoming").length;
+      const green = [0, 1, 2, 3, 4].filter((i) => getStepState(i, p) !== "upcoming").length;
       expect(fill).toBeGreaterThanOrEqual(lastFill);
       expect(green).toBeGreaterThanOrEqual(lastGreen);
       lastFill = fill;
@@ -252,10 +267,11 @@ describe("bar fill follows the stage at every transition", () => {
 
   it("line fill only reaches a green icon's centre, never past the last reached step", () => {
     expect(getLineFill(-1)).toBe(0);
-    expect(getLineFill(1)).toBeCloseTo(1 / 3);
-    expect(getLineFill(1.5)).toBeCloseTo(0.5);
-    expect(getLineFill(2)).toBeCloseTo(2 / 3);
-    expect(getLineFill(3)).toBe(1);
+    expect(getLineFill(1)).toBeCloseTo(1 / 4);
+    expect(getLineFill(1.5)).toBeCloseTo(3 / 8);
+    expect(getLineFill(2)).toBeCloseTo(2 / 4);
+    expect(getLineFill(3)).toBeCloseTo(3 / 4);
+    expect(getLineFill(4)).toBe(1);
   });
 
   it("re-rendering with a new position updates the same DOM in place (so the fill animates)", () => {
@@ -263,7 +279,7 @@ describe("bar fill follows the stage at every transition", () => {
     const fill = container.querySelector("[data-testid='progress-fill']");
     rerender(<OrderProgress position={2} />);
     expect(container.querySelector("[data-testid='progress-fill']")).toBe(fill);
-    expect((fill as HTMLElement).style.width.startsWith("66.66")).toBe(true);
+    expect((fill as HTMLElement).style.width).toBe("50%");
   });
 
   it("a cancel/reject after progress removes the bar entirely (the page header shows the failure)", () => {

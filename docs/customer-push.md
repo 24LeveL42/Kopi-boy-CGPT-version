@@ -6,8 +6,9 @@ in-app bell, toasts and inbox (`docs/notifications.md`), which are unchanged.
 
 ## What sends a push
 
-Decided by database triggers (`docs/supabase-customer-push.sql`), worded by
-`src/lib/order-push.ts`. Nothing else sends one.
+Decided by database triggers (`docs/supabase-customer-push.sql`, plus the
+Partner app's pickup trigger in its `docs/supabase-delivery-pickup.sql`),
+worded by `src/lib/order-push.ts`. Nothing else sends one.
 
 | Change (real columns) | Push |
 |---|---|
@@ -16,10 +17,15 @@ Decided by database triggers (`docs/supabase-customer-push.sql`), worded by
 | `orders.payment_status` → `paid` | Payment received. Your food is being prepared. |
 | `orders.payment_proof_rejected_at` set to a new time (still accepted + unpaid) | Your payment wasn't received. Please check and send your proof again. |
 | `delivery_requests.status` → `accepted` | A rider is on the way to pick up your order. |
+| `delivery_requests.picked_up_at` set (Partner app, event `order_picked_up`) | Your rider has collected your food and is on the way to deliver it. |
 | `delivery_requests.status` → `completed` | Your order was delivered. Enjoy! |
 
-There is no "rider picked up" state in the schema; `accepted` means the rider
-took the job and is heading to the kitchen, so the wording says that.
+`status` stays `accepted` while the rider carries the food, so "picked up"
+is `accepted` + `picked_up_at` set. The pickup push is sent by the Partner
+app's own trigger (`private.customer_push_on_delivery_pickup`) through this
+app's `private.send_customer_order_push`, with `ref` = the rider, so a new
+rider collecting after a release is a new push but the same pickup never
+repeats. Nothing in this repo's SQL needs re-running for it.
 
 The payload is only a short title, that one line, and the order link — no
 names, addresses, phone numbers, amounts or PayNow details.
