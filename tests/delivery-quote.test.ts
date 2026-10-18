@@ -148,6 +148,9 @@ describe("placeOrder — server-side delivery fee", () => {
       delivery_type: "express",
       delivery_distance_km: 5,
       delivery_fee_estimate: 5.5,
+      delivery_address_line: FOUND.address,
+      delivery_unit: null,
+      delivery_notes: null,
     });
   });
 

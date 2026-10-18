@@ -30,6 +30,10 @@ export interface OrderRow {
   customer_postal_code?: string | null;
   delivery_type?: string | null;
   delivery_distance_km?: number | null;
+  /** Address snapshot taken at checkout (docs/supabase-customer-addresses.sql); absent/null on older orders. */
+  delivery_address_line?: string | null;
+  delivery_unit?: string | null;
+  delivery_notes?: string | null;
   order_status: string;
   payment_status: string;
   preparation_status: string;
@@ -385,6 +389,18 @@ export default async function OrderConfirmationPage({
               <div data-testid="order-delivery-type" className="flex items-center justify-between text-sm" style={{ color: "var(--kb-ink-soft)" }}>
                 <span>Delivery</span>
                 <span>{deliveryTypeLabel}</span>
+              </div>
+            )}
+            {order.delivery_address_line && (
+              <div data-testid="order-delivery-address" className="text-sm" style={{ color: "var(--kb-ink-soft)" }}>
+                <div className="flex justify-between gap-4">
+                  <span className="shrink-0">Deliver to</span>
+                  <span className="text-right">
+                    {order.delivery_address_line}
+                    {order.delivery_unit && <span className="block">{order.delivery_unit}</span>}
+                  </span>
+                </div>
+                {order.delivery_notes && <p className="mt-1 text-right text-xs">Note: {order.delivery_notes}</p>}
               </div>
             )}
             {order.customer_postal_code && (

@@ -122,14 +122,22 @@ describe("Checkout — postal-code delivery fee", () => {
     expect(quoteDelivery).toHaveBeenCalledTimes(1);
   });
 
-  it("sends only the postal code and type to placeOrder, then opens the order", async () => {
+  it("sends only the postal code, type and typed details to placeOrder (no fee or coordinates), then opens the order", async () => {
     vi.mocked(placeOrder).mockResolvedValue({ ok: true, orderId: "order-9" });
     renderCheckout({ postalCode: "310123" });
     await screen.findByText(`Found: ${ADDRESS}`);
 
     fireEvent.click(screen.getByRole("button", { name: /Confirm Order/ }));
     await waitFor(() => expect(push).toHaveBeenCalledWith("/orders/order-9"));
-    expect(placeOrder).toHaveBeenCalledWith("k1", [{ menuItemId: "m1", quantity: 1 }], { postalCode: "310123", deliveryType: "normal" });
+    // No saved addresses yet, so "Save this address" starts ticked.
+    expect(placeOrder).toHaveBeenCalledWith("k1", [{ menuItemId: "m1", quantity: 1 }], {
+      postalCode: "310123",
+      deliveryType: "normal",
+      unit: "",
+      notes: "",
+      saveAddress: true,
+      saveLabel: "Home",
+    });
   });
 
   it("shows placeOrder's message and stays put when the order can't be created", async () => {

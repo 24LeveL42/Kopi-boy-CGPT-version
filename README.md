@@ -43,6 +43,9 @@ Done:
   VAPID keys, Vercel env vars, `docs/supabase-customer-push.sql` and one
   `update` for the webhook URL; exact steps in
   [`docs/customer-push.md`](./docs/customer-push.md)
+- Saved delivery addresses (`/account/addresses`, up to 5, one default) and
+  "Deliver to" at checkout, with the address text snapshotted onto each
+  order — needs `docs/supabase-customer-addresses.sql` run once
 - Testing — Vitest + Testing Library (search/filter logic, order status,
   cancellation, notifications + Realtime behaviour)
 

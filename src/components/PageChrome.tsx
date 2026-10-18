@@ -11,7 +11,7 @@ export function PageChrome() {
   const router = useRouter();
   if (pathname === "/" || pathname.startsWith("/merchant/")) return null;
 
-  const title = pathname.startsWith("/merchant/") ? "Kitchen" : pathname.startsWith("/orders/") ? "Order details" : pathname === "/orders" ? "My orders" : pathname === "/cart" ? "Your cart" : pathname === "/account" ? "My profile" : pathname === "/notifications" ? "Notifications" : pathname === "/login" ? "Sign in" : "Kopi Boy";
+  const title = pathname.startsWith("/merchant/") ? "Kitchen" : pathname.startsWith("/orders/") ? "Order details" : pathname === "/orders" ? "My orders" : pathname === "/cart" ? "Your cart" : pathname === "/account" ? "My profile" : pathname === "/account/addresses" ? "My addresses" : pathname === "/notifications" ? "Notifications" : pathname === "/login" ? "Sign in" : "Kopi Boy";
 
   return (
     <header className="kb-page-chrome">
