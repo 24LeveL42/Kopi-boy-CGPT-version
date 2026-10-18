@@ -10,7 +10,7 @@ vi.mock("@/lib/push-client", async (importOriginal) => {
   return { ...actual, detectPushState: () => detectPushState(), enablePush: () => enablePush() };
 });
 
-import { PushPrompt, IOS_INSTALL_HINT } from "@/components/PushNotifications";
+import { PushPrompt, PushToggle, IOS_INSTALL_HINT, PUSH_STATUS_TEXT } from "@/components/PushNotifications";
 import { PUSH_PROMPT_DISMISSED_KEY, isIosBrowserTab } from "@/lib/push-client";
 
 beforeEach(() => {
@@ -64,6 +64,41 @@ describe("PushPrompt", () => {
       expect(screen.queryByTestId("push-prompt")).not.toBeInTheDocument();
       unmount();
     }
+  });
+});
+
+describe("PushToggle — clear states", () => {
+  it("is a working switch when on or off", async () => {
+    detectPushState.mockResolvedValue("on");
+    render(<PushToggle />);
+    expect(await screen.findByText(PUSH_STATUS_TEXT.on)).toBeInTheDocument();
+    expect(screen.getByRole("switch")).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("switch")).toBeEnabled();
+  });
+
+  it("explains how to unblock when blocked in browser settings", async () => {
+    detectPushState.mockResolvedValue("blocked");
+    render(<PushToggle />);
+    expect(await screen.findByText("Blocked in your browser settings.")).toBeInTheDocument();
+    expect(screen.getByTestId("push-help")).toHaveTextContent(/Android \(Chrome\).*Notifications.*Allow/);
+    expect(screen.getByRole("switch")).toBeDisabled();
+  });
+
+  it("tells iPhone users to add to the Home Screen first, and Android users to use Chrome", async () => {
+    detectPushState.mockResolvedValue("unsupported");
+    render(<PushToggle />);
+    expect(await screen.findByText(PUSH_STATUS_TEXT.unsupported)).toBeInTheDocument();
+    expect(screen.getByTestId("push-help")).toHaveTextContent(/Add to Home Screen/);
+    expect(screen.getByTestId("push-help")).toHaveTextContent(/Chrome/);
+  });
+
+  it("re-checks when the customer comes back from settings", async () => {
+    detectPushState.mockResolvedValue("blocked");
+    render(<PushToggle />);
+    await screen.findByText("Blocked in your browser settings.");
+    detectPushState.mockResolvedValue("off");
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(await screen.findByText(PUSH_STATUS_TEXT.off)).toBeInTheDocument();
   });
 });
 

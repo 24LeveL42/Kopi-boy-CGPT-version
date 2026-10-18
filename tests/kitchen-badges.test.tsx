@@ -67,12 +67,21 @@ describe("MerchantCard — category + registered-business badges", () => {
     expect(within(container).getByTestId("rating-summary")).toHaveTextContent("5.0 (1 rating)");
   });
 
-  it("shows the postal sector when there is one, and just the distance when there isn't", () => {
+  it("shows the visible pill as a short star rating, with the full summary for screen readers", () => {
+    const { container } = render(<MerchantCard merchant={merchant({ rating: 4.6, ratingCount: 23 })} />);
+    const pill = within(container).getByTestId("rating-summary");
+    expect(pill.querySelector("[aria-hidden='true']")).toHaveTextContent("★ 4.6");
+    expect(pill.querySelector(".sr-only")).toHaveTextContent("4.6 (23 ratings)");
+  });
+
+  // The V3 card shows cuisine + postal sector only; distance moved off the card.
+  it("shows the postal sector next to the cuisine when there is one, and no stray separator or 'null' when there isn't", () => {
     const withArea = render(<MerchantCard merchant={merchant({ area: "Postal sector 31" })} />);
-    expect(withArea.container).toHaveTextContent("Postal sector 31 · Distance unavailable");
+    expect(withArea.container).toHaveTextContent("Chinese · Postal sector 31");
     cleanup();
     const { container } = render(<MerchantCard merchant={merchant({ area: null })} />);
-    expect(container).toHaveTextContent("Distance unavailable");
+    expect(within(container).getByText("Chinese")).toBeInTheDocument();
+    expect(container).not.toHaveTextContent("Chinese ·");
     expect(container).not.toHaveTextContent("null");
   });
 });

@@ -19,6 +19,7 @@ import {
   getPaymentProofState,
 } from "@/lib/payment-proof";
 import { DELIVERY_TYPE_LABEL, isDeliveryType } from "@/lib/delivery-types";
+import { asapArrivalEstimate } from "@/lib/delivery-time";
 
 export interface OrderRow {
   id: string;
@@ -34,6 +35,8 @@ export interface OrderRow {
   delivery_address_line?: string | null;
   delivery_unit?: string | null;
   delivery_notes?: string | null;
+  /** Chosen delivery slot; null = As soon as possible. Absent where the column doesn't exist. */
+  scheduled_for?: string | null;
   order_status: string;
   payment_status: string;
   preparation_status: string;
@@ -175,10 +178,14 @@ function getPaymentMessage(
  */
 export default async function OrderConfirmationPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const { id } = await params;
+  // Set by checkout when the order went through but "Save this address" didn't.
+  const addressNotSaved = (await searchParams)?.address === "not-saved";
   const supabase = await createClient();
 
   // select("*") rather than an explicit column list: `ready_at` is new (this
@@ -284,6 +291,8 @@ export default async function OrderConfirmationPage({
   const total = order.subtotal + (deliveryFee ?? 0);
   const deliveryTypeLabel = isDeliveryType(order.delivery_type) ? DELIVERY_TYPE_LABEL[order.delivery_type] : null;
   const deliveryDistanceKm = order.delivery_distance_km != null ? Number(order.delivery_distance_km) : null;
+  const scheduledFor = formatTimestamp(order.scheduled_for ?? null);
+  const arrival = header.failed ? null : asapArrivalEstimate(order, activeDelivery?.status === "completed");
 
   // Pay-and-upload card once the cook accepts. Uploading needs a signed-in
   // customer; without one the old one-line payment message stays.
@@ -335,6 +344,28 @@ export default async function OrderConfirmationPage({
           {stageTimestamp && (
             <p className="mt-1 text-[11px]" style={{ color: "var(--kb-ink-soft)" }}>
               {stageTimestamp}
+            </p>
+          )}
+          {!header.failed && scheduledFor && (
+            <p data-testid="order-scheduled-for" className="mt-3 text-sm font-semibold">
+              Scheduled for {scheduledFor}
+            </p>
+          )}
+          {arrival && (
+            <p data-testid="order-eta" className="mt-3 text-sm">
+              <span className="font-semibold">Estimated arrival: {arrival.text}</span>{" "}
+              <span className="text-xs" style={{ color: "var(--kb-ink-soft)" }}>
+                (estimate)
+              </span>
+            </p>
+          )}
+          {addressNotSaved && (
+            <p data-testid="address-not-saved" role="status" className="mt-3 rounded-xl p-3 text-left text-xs" style={{ background: "var(--kb-cream)" }}>
+              Your order is placed. We just couldn&apos;t save this address to{" "}
+              <Link href="/account/addresses" className="font-semibold" style={{ color: "var(--kb-green-deep)" }}>
+                My Addresses
+              </Link>
+              , so you can add it there any time.
             </p>
           )}
           {/* After the first order, never on a first visit: this page only exists once one is placed. */}
@@ -391,6 +422,10 @@ export default async function OrderConfirmationPage({
                 <span>{deliveryTypeLabel}</span>
               </div>
             )}
+            <div data-testid="order-when" className="flex items-center justify-between text-sm" style={{ color: "var(--kb-ink-soft)" }}>
+              <span>When</span>
+              <span>{scheduledFor ? `Scheduled · ${scheduledFor}` : "As soon as possible"}</span>
+            </div>
             {order.delivery_address_line && (
               <div data-testid="order-delivery-address" className="text-sm" style={{ color: "var(--kb-ink-soft)" }}>
                 <div className="flex justify-between gap-4">

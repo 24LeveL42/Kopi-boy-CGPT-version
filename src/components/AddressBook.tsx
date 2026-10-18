@@ -8,6 +8,7 @@ import {
   MAX_LABEL_LENGTH,
   MAX_NOTES_LENGTH,
   MAX_UNIT_LENGTH,
+  POSTAL_CODE_HINT,
   PRESET_LABELS,
   canAddAddress,
   type SavedAddress,
@@ -247,6 +248,7 @@ function AddressForm({
           Check postal code
         </button>
       </div>
+      <p className="mt-1 text-xs text-slate-400">{POSTAL_CODE_HINT}</p>
       {(checking || postalStatus) && (
         <p data-testid="address-postal-status" className={`mt-2 text-xs ${postalStatus?.found && !checking ? "font-semibold text-purple-700" : "text-slate-500"}`}>
           {checking ? "Checking postal code…" : postalStatus?.text}

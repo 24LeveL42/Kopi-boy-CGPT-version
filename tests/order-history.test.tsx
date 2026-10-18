@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import OrdersPage from "@/app/orders/page";
+import { CartProvider } from "@/lib/cart-context";
 
 type Call = [string, ...unknown[]];
 
@@ -54,7 +55,8 @@ function row(overrides: Record<string, unknown> = {}) {
 }
 
 async function renderPage() {
-  return render(await OrdersPage());
+  // The root layout provides CartProvider in the app; BottomNav needs it for the cart badge.
+  return render(<CartProvider>{await OrdersPage()}</CartProvider>);
 }
 
 beforeEach(() => {
@@ -94,6 +96,14 @@ describe("/orders — order history", () => {
     expect(items[1]).toHaveAttribute("href", "/orders/o1");
     expect(items[1]).toHaveTextContent("Kitchen"); // kitchen offline -> RLS hides it -> fallback name
     expect(items[1]).toHaveTextContent("Order was cancelled");
+  });
+
+  it("shows the scheduled delivery time, and nothing extra for as-soon-as-possible orders", async () => {
+    db.rows = [row({ id: "o2", scheduled_for: "2026-09-21T10:30:00.000Z" }), row({ id: "o1" })];
+    await renderPage();
+    const items = screen.getAllByTestId("order-history-row");
+    expect(items[0]).toHaveTextContent(/Scheduled for 21 Sept.*6:30/); // 10:30Z = 18:30 SGT
+    expect(items[1]).not.toHaveTextContent("Scheduled");
   });
 
   it("falls back to the unfiltered query if the archive column doesn't exist yet", async () => {

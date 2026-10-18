@@ -1,0 +1,73 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen, within } from "@testing-library/react";
+import { CartProvider } from "@/lib/cart-context";
+
+const auth = vi.hoisted(() => ({ user: { id: "customer-1", email: "a@example.com", user_metadata: {} } as unknown }));
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: async () => ({ auth: { getUser: async () => ({ data: { user: auth.user } }) } }),
+}));
+vi.mock("@/lib/supabase/client", () => ({ createClient: () => ({ auth: { signOut: vi.fn() } }) }));
+vi.mock("@/components/SupportMessageForm", () => ({ SupportMessageForm: () => <div data-testid="support-message-form" /> }));
+vi.mock("next/navigation", () => ({ usePathname: () => "/account", useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
+
+import AccountPage from "@/app/account/page";
+import PaymentMethodPage from "@/app/account/payment/page";
+import AboutPage from "@/app/account/about/page";
+import HelpPage from "@/app/account/help/page";
+
+const inApp = (ui: React.ReactNode) => render(<CartProvider>{ui}</CartProvider>);
+afterEach(cleanup);
+
+describe("Profile", () => {
+  it("links every row to a real page — none are greyed out", async () => {
+    inApp(await AccountPage());
+    for (const [name, href] of [
+      ["Notifications", "/account/notifications"],
+      ["Payment Method", "/account/payment"],
+      ["Help & Support", "/account/help"],
+      ["About Kopi Boy", "/account/about"],
+    ]) {
+      expect(screen.getByRole("link", { name: new RegExp(name) })).toHaveAttribute("href", href);
+    }
+    expect(document.querySelector(".is-disabled")).toBeNull();
+  });
+});
+
+describe("Payment method", () => {
+  it("explains PayNow-to-the-kitchen, 0% commission and that nothing is stored", () => {
+    inApp(<PaymentMethodPage />);
+    const page = document.body;
+    expect(page).toHaveTextContent("The cook accepts");
+    expect(page).toHaveTextContent("Send your proof of payment");
+    expect(page).toHaveTextContent("never holds your money");
+    expect(page).toHaveTextContent("0% commission");
+    expect(page).toHaveTextContent("No cards or bank details stored");
+  });
+});
+
+describe("About", () => {
+  it("describes Kopi Boy as a connector with 0% commission and riders paid by the kitchen", () => {
+    inApp(<AboutPage />);
+    expect(document.body).toHaveTextContent("connects home cooks, hawkers and small food businesses");
+    expect(document.body).toHaveTextContent("0% commission");
+    expect(document.body).toHaveTextContent("The kitchen pays the rider the delivery fee directly.");
+  });
+});
+
+describe("Help & Support", () => {
+  it("has the FAQ topics and the message form for a signed-in customer", async () => {
+    inApp(await HelpPage());
+    const faq = screen.getByTestId("help-faq");
+    for (const topic of ["place an order", "PayNow", "delivery fee an estimate", "cancel", "notifications", "saved addresses"]) {
+      expect(within(faq).getByText(new RegExp(topic, "i"), { selector: "summary span" })).toBeInTheDocument();
+    }
+    expect(screen.getByTestId("support-message-form")).toBeInTheDocument();
+  });
+
+  it("asks a signed-out visitor to sign in instead of showing the form", async () => {
+    auth.user = null;
+    inApp(await HelpPage());
+    expect(screen.queryByTestId("support-message-form")).toBeNull();
+    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
+  });
+});

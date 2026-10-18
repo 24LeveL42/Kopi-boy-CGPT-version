@@ -46,6 +46,14 @@ Done:
 - Saved delivery addresses (`/account/addresses`, up to 5, one default) and
   "Deliver to" at checkout, with the address text snapshotted onto each
   order — needs `docs/supabase-customer-addresses.sql` run once
+- Scheduled delivery: checkout "When" (As soon as possible, or a 30-minute
+  slot 45 min–2 days ahead, re-checked by `placeOrder` on the server) saved to
+  `orders.scheduled_for`; ASAP orders show an estimated arrival
+  (`src/lib/delivery-time.ts`)
+- Profile pages: Notifications settings, Payment method, Help & Support (FAQ
+  + "Message Kopi Boy", stored in the Partner schema's `admin_messages`) and
+  About. Terms/Privacy links appear once their URLs are set in
+  `src/lib/legal-links.ts`
 - Testing — Vitest + Testing Library (search/filter logic, order status,
   cancellation, notifications + Realtime behaviour)
 

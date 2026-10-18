@@ -133,6 +133,7 @@ describe("Checkout — postal-code delivery fee", () => {
     expect(placeOrder).toHaveBeenCalledWith("k1", [{ menuItemId: "m1", quantity: 1 }], {
       postalCode: "310123",
       deliveryType: "normal",
+      scheduledFor: null,
       unit: "",
       notes: "",
       saveAddress: true,
@@ -148,5 +149,54 @@ describe("Checkout — postal-code delivery fee", () => {
     fireEvent.click(screen.getByRole("button", { name: /Confirm Order/ }));
     expect(await screen.findByText("This kitchen hasn't finished setting up its location yet.")).toBeInTheDocument();
     expect(push).not.toHaveBeenCalled();
+  });
+});
+
+describe("Checkout — When", () => {
+  it("defaults to As soon as possible and has no 'coming soon' schedule tile any more", async () => {
+    renderCheckout({ postalCode: "310123" });
+    await screen.findByText(`Found: ${ADDRESS}`);
+    expect(screen.getByRole("button", { name: /As soon as possible/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByText("Coming soon")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Delivery time")).not.toBeInTheDocument();
+  });
+
+  it("lists 30-minute slots at least 45 minutes ahead and sends the chosen one", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-18T02:07:00.000Z")); // 10:07 SGT
+    try {
+      vi.mocked(placeOrder).mockResolvedValue({ ok: true, orderId: "order-9" });
+      renderCheckout({ postalCode: "310123" });
+      await screen.findByText(`Found: ${ADDRESS}`);
+
+      fireEvent.click(screen.getByRole("button", { name: /Schedule/ }));
+      const select = screen.getByLabelText("Delivery time") as HTMLSelectElement;
+      // "Choose a time" first, then the first slot: 11:00 today.
+      expect(select.options[1].value).toBe("2026-10-18T03:00:00.000Z");
+      expect(select.options[1].textContent).toMatch(/^Today, 11:00/);
+      // Confirm stays disabled until a time is picked.
+      expect(screen.getByRole("button", { name: /Confirm Order/ })).toBeDisabled();
+      expect(screen.getByTestId("time-required")).toBeInTheDocument();
+
+      fireEvent.change(select, { target: { value: "2026-10-18T09:30:00.000Z" } });
+      fireEvent.click(screen.getByRole("button", { name: /Confirm Order/ }));
+      await waitFor(() => expect(placeOrder).toHaveBeenCalled());
+      expect(vi.mocked(placeOrder).mock.calls[0][2]).toMatchObject({ scheduledFor: "2026-10-18T09:30:00.000Z" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("opens the order with a gentle note flag when Save this address failed", async () => {
+    vi.mocked(placeOrder).mockResolvedValue({ ok: true, orderId: "order-9", addressSaved: false });
+    renderCheckout({ postalCode: "310123" });
+    await screen.findByText(`Found: ${ADDRESS}`);
+    fireEvent.click(screen.getByRole("button", { name: /Confirm Order/ }));
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/orders/order-9?address=not-saved"));
+  });
+
+  it("hints at a nearby postal code for new buildings", () => {
+    renderCheckout();
+    expect(screen.getByText("New building? Try a nearby postal code.")).toBeInTheDocument();
   });
 });

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { MAX_ADDRESSES, MAX_NOTES_LENGTH, MAX_UNIT_LENGTH, NEW_ADDRESS, PRESET_LABELS, type SavedAddress } from "@/lib/addresses";
+import { MAX_ADDRESSES, MAX_NOTES_LENGTH, MAX_UNIT_LENGTH, NEW_ADDRESS, POSTAL_CODE_HINT, PRESET_LABELS, type SavedAddress } from "@/lib/addresses";
 
 const INPUT_CLASS = "mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm";
 
@@ -76,6 +76,7 @@ export function DeliverTo({
           Check postal code
         </button>
       </div>
+      <p className="mt-1 text-xs text-slate-400">{POSTAL_CODE_HINT}</p>
       {status}
       <label htmlFor="delivery-unit" className="mt-3 block text-sm font-bold">
         Unit <span className="font-normal text-slate-400">(optional)</span>

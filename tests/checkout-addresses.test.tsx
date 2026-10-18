@@ -78,7 +78,7 @@ describe("Checkout — Deliver to", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Confirm Order/ }));
     await waitFor(() => expect(push).toHaveBeenCalledWith("/orders/order-9"));
-    expect(placeOrder).toHaveBeenCalledWith("k1", [{ menuItemId: "m1", quantity: 1 }], { deliveryType: "express", addressId: "home" });
+    expect(placeOrder).toHaveBeenCalledWith("k1", [{ menuItemId: "m1", quantity: 1 }], { deliveryType: "express", scheduledFor: null, addressId: "home" });
   });
 
   it("delivers to a different address: postal check, unit, notes, save off by default", async () => {
@@ -102,6 +102,7 @@ describe("Checkout — Deliver to", () => {
     await waitFor(() => expect(placeOrder).toHaveBeenCalled());
     expect(vi.mocked(placeOrder).mock.calls[0][2]).toEqual({
       deliveryType: "normal",
+      scheduledFor: null,
       postalCode: "560123",
       unit: "#10-01",
       notes: "Call when you arrive",

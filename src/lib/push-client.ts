@@ -10,7 +10,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export type PushState =
   | "loading"
   | "unconfigured" // no VAPID public key in this build
-  | "unsupported" // browser can't do Web Push
+  | "insecure" // page isn't on https://, where browsers hide the push APIs
+  | "unsupported" // browser can't do Web Push (e.g. an in-app browser)
   | "needs-install" // iPhone/iPad Safari tab: push only works once added to the Home Screen
   | "blocked" // the browser permission was denied
   | "off"
@@ -73,6 +74,13 @@ async function registerServiceWorker() {
   }
 }
 
+/** Why the push APIs are missing: no https, iPhone Safari tab, or a browser without them. */
+function missingApisState(): PushState {
+  if (isIosBrowserTab(navigator.userAgent, runningStandalone())) return "needs-install";
+  if (window.isSecureContext === false) return "insecure";
+  return "unsupported";
+}
+
 async function currentSubscription() {
   const reg = await navigator.serviceWorker.getRegistration();
   return (await reg?.pushManager.getSubscription()) ?? null;
@@ -97,7 +105,7 @@ async function deleteSubscriptionRow(supabase: SupabaseClient, endpoint: string)
 /** What the notifications switch / prompt should show right now. */
 export async function detectPushState(): Promise<PushState> {
   if (!VAPID_PUBLIC_KEY) return "unconfigured";
-  if (!pushApisPresent()) return isIosBrowserTab(navigator.userAgent, runningStandalone()) ? "needs-install" : "unsupported";
+  if (!pushApisPresent()) return missingApisState();
   if (Notification.permission === "denied") return "blocked";
   if (Notification.permission === "granted" && (await currentSubscription())) return "on";
   return "off";
@@ -106,12 +114,13 @@ export async function detectPushState(): Promise<PushState> {
 /** Must run from a tap: browsers reject permission prompts that aren't user-initiated. */
 export async function enablePush(supabase: SupabaseClient): Promise<PushState> {
   if (!VAPID_PUBLIC_KEY) return "unconfigured";
-  if (!pushApisPresent()) return isIosBrowserTab(navigator.userAgent, runningStandalone()) ? "needs-install" : "unsupported";
+  if (!pushApisPresent()) return missingApisState();
 
   const permission = await Notification.requestPermission();
   if (permission !== "granted") return permission === "denied" ? "blocked" : "off";
 
-  await registerServiceWorker();
+  // Without a registration, `ready` below would never resolve and the switch would spin forever.
+  if (!(await registerServiceWorker())) throw new Error("Service worker registration failed");
   const reg = await navigator.serviceWorker.ready;
   const sub =
     (await reg.pushManager.getSubscription()) ??

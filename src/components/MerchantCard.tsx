@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useReducer, useSyncExternalStore } from "react";
 import { Merchant } from "@/lib/types";
 import { UNAVAILABLE_LABEL } from "@/lib/kitchen-availability";
-import { CategoryPill, RegisteredBadge } from "./KitchenBadges";
+import { CategoryPill, RegisteredBadge, formatRatingSummary } from "./KitchenBadges";
 
 const FAV_KEY = "kb-favourites";
 // The card doesn't follow other cards' toggles; it re-reads storage when it renders.
@@ -46,7 +46,7 @@ export function MerchantCard({ merchant, variant = "grid" }: { merchant: Merchan
       <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent"/>
       {blocked?<span className="absolute left-3 top-3">{unavailableBadge}</span>:merchant.isNew&&<span className="kb-card-new">NEW</span>}
       <button type="button" onClick={toggle} aria-label={fav ? "Remove favourite" : "Add favourite"} className={`kb-card-heart ${fav ? "is-fav" : ""}`}>{fav ? "♥" : "♡"}</button>
-      <div className="absolute inset-x-0 bottom-0 p-3.5"><div className="flex items-end justify-between gap-2"><div className="min-w-0"><h3 className="truncate text-[15px] font-extrabold text-white">{merchant.name}</h3><p className="mt-0.5 truncate text-xs text-white/80">{merchant.cuisine}{merchant.area?` · ${merchant.area}`:""}</p></div><span className="kb-rating-pill">★ {merchant.rating>0?merchant.rating.toFixed(1):"New"}</span></div></div>
+      <div className="absolute inset-x-0 bottom-0 p-3.5"><div className="flex items-end justify-between gap-2"><div className="min-w-0"><h3 className="truncate text-[15px] font-extrabold text-white">{merchant.name}</h3><p className="mt-0.5 truncate text-xs text-white/80">{merchant.cuisine}{merchant.area?` · ${merchant.area}`:""}</p></div><span data-testid="rating-summary" className="kb-rating-pill"><span aria-hidden="true">★ {merchant.rating>0?merchant.rating.toFixed(1):"New"}</span><span className="sr-only">{formatRatingSummary(merchant.rating,merchant.ratingCount??0)}</span></span></div></div>
     </div>
     <div className="p-3.5"><div className="flex items-center gap-1.5"><CategoryPill category={merchant.category}/>{merchant.businessUen&&<RegisteredBadge uen={merchant.businessUen}/>}</div><div className="mt-3 flex items-center justify-between text-xs text-slate-500"><span>◷ {merchant.etaMinutes}–{merchant.etaMinutes+15} min</span><span>From <b className="text-slate-900">${merchant.priceFrom.toFixed(2)}</b></span></div>{merchant.menuHighlights[0]?.name&&<p className="mt-2 truncate text-sm font-bold text-slate-800">Popular · {merchant.menuHighlights[0].name}</p>}</div>
   </Link>;

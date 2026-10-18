@@ -321,3 +321,52 @@ describe("/orders/[id] — rating + totals", () => {
     expect(within(container).getByTestId("order-total")).toHaveTextContent("Total$12.50");
   });
 });
+
+describe("Order page — when it arrives", () => {
+  it("shows a scheduled order's time, and no ASAP estimate", async () => {
+    const { container } = await renderPage(order({ scheduled_for: "2026-01-01T10:30:00.000Z" }), []);
+    expect(within(container).getByTestId("order-scheduled-for")).toHaveTextContent(/Scheduled for 1 Jan.*6:30/); // 10:30Z = 18:30 SGT
+    expect(within(container).getByTestId("order-when")).toHaveTextContent(/WhenScheduled · 1 Jan.*6:30/);
+    expect(within(container).queryByTestId("order-eta")).toBeNull();
+  });
+
+  it("shows an ASAP order's estimated arrival, counted from acceptance and labelled as an estimate", async () => {
+    // decided_at 00:05Z = 08:05 SGT -> 08:30–08:45.
+    const { container } = await renderPage(order(), []);
+    const eta = within(container).getByTestId("order-eta");
+    expect(eta).toHaveTextContent(/Estimated arrival: 8:30.*8:45/);
+    expect(eta).toHaveTextContent("(estimate)");
+    expect(within(container).getByTestId("order-when")).toHaveTextContent("WhenAs soon as possible");
+  });
+
+  it("before the kitchen accepts, says the estimate starts from acceptance", async () => {
+    const { container } = await renderPage(order({ order_status: "placed", decided_at: null, preparation_status: "not_started" }), []);
+    expect(within(container).getByTestId("order-eta")).toHaveTextContent("About 25–40 min after the kitchen accepts (estimate)");
+  });
+
+  it("drops the estimate once delivered, or for a cancelled order", async () => {
+    const delivered = await renderPage(order(), [completed]);
+    expect(within(delivered.container).queryByTestId("order-eta")).toBeNull();
+    cleanup();
+    const cancelled = await renderPage(order({ order_status: "cancelled" }), []);
+    expect(within(cancelled.container).queryByTestId("order-eta")).toBeNull();
+  });
+
+  it("gently says the address wasn't saved when checkout flags it", async () => {
+    db.order = order();
+    db.deliveries = [];
+    const ui = await OrderConfirmationPage({
+      params: Promise.resolve({ id: "order-1" }),
+      searchParams: Promise.resolve({ address: "not-saved" }),
+    });
+    const { container } = render(ui);
+    const note = within(container).getByTestId("address-not-saved");
+    expect(note).toHaveTextContent("Your order is placed.");
+    expect(within(note).getByRole("link", { name: "My Addresses" })).toHaveAttribute("href", "/account/addresses");
+  });
+
+  it("shows no address note normally", async () => {
+    const { container } = await renderPage(order(), []);
+    expect(within(container).queryByTestId("address-not-saved")).toBeNull();
+  });
+});

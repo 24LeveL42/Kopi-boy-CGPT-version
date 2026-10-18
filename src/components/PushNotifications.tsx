@@ -20,11 +20,17 @@ function usePushState() {
   const [state, setState] = useState<PushState>("loading");
   useEffect(() => {
     let alive = true;
-    detectPushState()
-      .then((s) => alive && setState(s))
-      .catch(() => alive && setState("unsupported"));
+    const detect = () =>
+      detectPushState()
+        .then((s) => alive && setState(s))
+        .catch(() => alive && setState("unsupported"));
+    detect();
+    // Coming back from the browser's settings (e.g. after unblocking): look again.
+    const onVisible = () => document.visibilityState === "visible" && detect();
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       alive = false;
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, []);
   return [state, setState] as const;
@@ -100,14 +106,33 @@ export function PushPrompt() {
   );
 }
 
-const STATE_NOTE: Partial<Record<PushState, string>> = {
-  unconfigured: "Notifications aren't available yet.",
+export const PUSH_STATUS_TEXT: Record<PushState, string> = {
+  loading: "Checking…",
+  on: "On. You'll get a notification when your order changes.",
+  off: "Off. Switch on to hear about your order even with the app closed.",
+  blocked: "Blocked in your browser settings.",
+  "needs-install": "Add Kopi Boy to your Home Screen first.",
+  insecure: "Only available on the secure (https://) Kopi Boy site.",
   unsupported: "This browser can't show notifications.",
-  "needs-install": IOS_INSTALL_HINT,
-  blocked: "Notifications are blocked for this site. Allow them in your browser's settings, then come back.",
+  unconfigured: "Notifications aren't set up for Kopi Boy yet. Please check back soon.",
 };
 
-/** On/off switch for order notifications, on /account. */
+/** Step-by-step help for the states the customer can fix themselves. */
+const STATE_HELP: Partial<Record<PushState, string[]>> = {
+  blocked: [
+    "Android (Chrome): tap the icon to the left of the web address, then Permissions or Site settings, then Notifications, and choose Allow.",
+    "If you added Kopi Boy to your Home Screen: press and hold its icon, tap App info, then Notifications, and switch them on.",
+    "iPhone (Home Screen app): open Settings, then Notifications, then Kopi Boy, and turn on Allow Notifications.",
+    "Then come back to this page.",
+  ],
+  "needs-install": [IOS_INSTALL_HINT, "Then open Kopi Boy from the Home Screen and switch notifications on here."],
+  unsupported: [
+    "On iPhone or iPad: open Kopi Boy in Safari, tap Share, then Add to Home Screen, and open it from there.",
+    "On Android: open Kopi Boy in Chrome itself, not inside another app such as WhatsApp or Instagram.",
+  ],
+};
+
+/** On/off switch for order notifications, on /account/notifications. */
 export function PushToggle() {
   const [state, setState] = usePushState();
   const [error, setError] = useState<string | null>(null);
@@ -133,7 +158,7 @@ export function PushToggle() {
     });
   }
 
-  const note = STATE_NOTE[state];
+  const help = STATE_HELP[state];
   return (
     <div className="kb-signout-card mt-4" data-testid="push-toggle">
       <div className="flex items-center gap-3">
@@ -141,7 +166,9 @@ export function PushToggle() {
           <p id="push-toggle-label" className="text-sm font-bold text-slate-800">
             Order notifications
           </p>
-          <p className="mt-0.5 text-xs text-slate-500">Get a notification when your order changes.</p>
+          <p data-testid="push-status" data-state={state} className="mt-0.5 text-xs text-slate-500">
+            {PUSH_STATUS_TEXT[state]}
+          </p>
         </div>
         <button
           type="button"
@@ -160,7 +187,13 @@ export function PushToggle() {
           />
         </button>
       </div>
-      {note && <p className="mt-2 text-xs text-slate-500">{note}</p>}
+      {help && (
+        <ul data-testid="push-help" className="mt-3 list-disc space-y-1 pl-4 text-xs leading-5 text-slate-500">
+          {help.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      )}
       {error && (
         <p className="mt-2 text-xs" style={{ color: "var(--kb-danger)" }}>
           {error}

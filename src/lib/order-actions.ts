@@ -6,6 +6,7 @@ import { deliveryQuoteMessage, isDeliveryType, type DeliveryType } from "@/lib/d
 import { getKitchenOrderStatus } from "@/lib/kitchens";
 import { UNAVAILABLE_ORDER_MESSAGE } from "@/lib/kitchen-availability";
 import { canAddAddress, isAddressId, validateAddressDetails, validateAddressInput } from "@/lib/addresses";
+import { validateScheduledFor } from "@/lib/delivery-time";
 
 export type PlaceOrderResult =
   | { ok: true; orderId: string; addressSaved?: boolean }
@@ -15,10 +16,12 @@ export type PlaceOrderResult =
  * Where the order goes: one of the customer's saved addresses (`addressId`),
  * or a new address (`postalCode` + optional unit/notes, optionally saved).
  * Nothing else is read — coordinates, fees or address text a caller adds
- * are ignored.
+ * are ignored. `scheduledFor` is an ISO time from the checkout's slot list,
+ * or empty for As soon as possible — re-checked here against the server clock.
  */
 export interface OrderDelivery {
   deliveryType: DeliveryType;
+  scheduledFor?: string | null;
   addressId?: string | null;
   postalCode?: string;
   unit?: string | null;
@@ -28,6 +31,7 @@ export interface OrderDelivery {
 }
 
 const SAVED_ADDRESS_MISSING = "That saved address couldn't be found. Please choose another one.";
+const SCHEDULING_UNAVAILABLE = "Scheduled delivery isn't available yet. Please choose As soon as possible.";
 
 // PGRST204 / 42703: the orders.delivery_address_* columns don't exist yet
 // (docs/supabase-customer-addresses.sql not run).
@@ -70,6 +74,8 @@ export async function placeOrder(
     }
   }
   if (!isDeliveryType(delivery?.deliveryType)) return { ok: false, message: "Choose Normal or Express delivery." };
+  const schedule = validateScheduledFor(delivery.scheduledFor, new Date());
+  if (!schedule.ok) return schedule;
 
   const savedAddressId = delivery.addressId ?? null;
   let postalCode = "";
@@ -144,11 +150,15 @@ export async function placeOrder(
     delivery_type: delivery.deliveryType,
     delivery_distance_km: quote.distanceKm,
     delivery_fee_estimate: quote.fee,
+    // Left out for As soon as possible, so the column's default (null) applies.
+    ...(schedule.scheduledFor ? { scheduled_for: schedule.scheduledFor } : {}),
   };
   const insertOrder = (row: object) => supabase.from("orders").insert(row).select("id").single();
   let { data: order, error: orderError } = await insertOrder({ ...orderRow, ...snapshot });
   // Until the address migration runs, place the order as before (postal code only).
   if (isMissingColumn(orderError)) ({ data: order, error: orderError } = await insertOrder(orderRow));
+  // Still missing a column with only the base row: orders.scheduled_for isn't there.
+  if (isMissingColumn(orderError) && schedule.scheduledFor) return { ok: false, message: SCHEDULING_UNAVAILABLE };
   if (orderError || !order) return { ok: false, message: `Couldn't place order: ${orderError?.message ?? "unknown error"}` };
 
   const { error: itemsError } = await supabase

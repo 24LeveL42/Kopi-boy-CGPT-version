@@ -130,7 +130,13 @@ secret in the config row · `503` = env vars missing or not redeployed.
 - **iPhone:** Safari only allows push from an app added to the Home Screen.
   In a Safari tab the card instead says *"To get notifications on iPhone, tap
   Share then Add to Home Screen."*
-- **Switch:** Account page → "Order notifications" on/off.
+- **Switch:** Profile → Notifications (`/account/notifications`) → "Order
+  notifications" on/off. It always says which state it's in: on, off,
+  blocked in browser settings (with steps to unblock), iPhone needs Add to
+  Home Screen, not on https, browser can't do it (e.g. an in-app browser), or
+  not set up. **"Notifications aren't set up for Kopi Boy yet"** means the
+  deployed build has no `NEXT_PUBLIC_VAPID_PUBLIC_KEY`: it's read when the app
+  is built, so add it in Vercel (step 2) and redeploy.
 - **Shared phones:** signing in hands the device's subscription to the new
   account; signing out removes it.
 - Code: `public/sw.js` (shows the push, opens the order on tap),

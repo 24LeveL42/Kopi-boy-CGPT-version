@@ -5,7 +5,7 @@ import { useCart } from "@/lib/cart-context";
 export function BottomNav(){
  const pathname=usePathname(); const {itemCount}=useCart();
  const items=[{href:"/",label:"Home",icon:<HomeIcon/>},{href:"/orders",label:"Orders",icon:<OrdersIcon/>},{href:"/favourites",label:"Favourites",icon:<HeartIcon/>},{href:"/account",label:"Profile",icon:<ProfileIcon/>}];
- return <nav className="kb-bottom-nav" aria-label="Primary navigation"><div className="kb-bottom-nav-inner">{items.map(it=>{const active=it.href==="/"?pathname==="/":pathname.startsWith(it.href);return <Link key={it.label} href={it.href} className={`kb-bottom-item ${active?"is-active":""}`}><span>{it.icon}</span><span>{it.label}</span></Link>})}{itemCount>0&&<Link href="/cart" className="kb-bottom-cart"><BagIcon/><b>{itemCount}</b></Link>}</div></nav>
+ return <nav className="kb-bottom-nav" aria-label="Primary navigation"><div className="kb-bottom-nav-inner">{items.map(it=>{const active=it.href==="/"?pathname==="/":pathname.startsWith(it.href);return <Link key={it.label} href={it.href} aria-current={active?"page":undefined} className={`kb-bottom-item ${active?"is-active":""}`}><span>{it.icon}</span><span>{it.label}</span></Link>})}{itemCount>0&&<Link href="/cart" className="kb-bottom-cart"><BagIcon/><b>{itemCount}</b></Link>}</div></nav>
 }
 function HomeIcon(){return <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"><path d="M3 11l9-7 9 7"/><path d="M5 10v9a1 1 0 001 1h12a1 1 0 001-1v-9"/></svg>}
 function OrdersIcon(){return <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"><rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>}

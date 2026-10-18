@@ -106,6 +106,9 @@ export function canAddAddress(count: number): boolean {
 
 /** What checkout's "Deliver to" starts on: the default address, else the first saved one, else a new address. */
 export const NEW_ADDRESS = "new";
+
+/** Under every postal code field: OneMap doesn't know brand-new buildings yet. */
+export const POSTAL_CODE_HINT = "New building? Try a nearby postal code.";
 export function initialDeliverySelection(addresses: SavedAddress[]): string {
   return (addresses.find((a) => a.is_default) ?? addresses[0])?.id ?? NEW_ADDRESS;
 }

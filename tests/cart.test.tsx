@@ -5,7 +5,7 @@ import { CartButton } from "@/components/CartButton";
 import { CartView } from "@/components/CartView";
 import { complaintPhotoPath, normalizeComplaintBody, validateComplaintPhoto } from "@/lib/complaints";
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => "/cart" }));
 vi.mock("@/lib/order-actions", () => ({ placeOrder: vi.fn() }));
 vi.mock("@/lib/kitchen-actions", () => ({ isKitchenBlocked: vi.fn(async () => false) }));
 vi.mock("@/lib/use-customer-location", () => ({
@@ -84,7 +84,7 @@ describe("CartView remove + clear all", () => {
     renderWithCart(<CartView isSignedIn />);
     fireEvent.click(await screen.findByRole("button", { name: "Remove Kopi from cart" }));
     fireEvent.click(screen.getByRole("button", { name: "Remove Kaya Toast from cart" }));
-    expect(screen.getByText("Your cart is empty.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Your cart is waiting" })).toBeInTheDocument();
   });
 
   it("quantity stepper still works independently of remove", async () => {
@@ -96,15 +96,15 @@ describe("CartView remove + clear all", () => {
   it("Clear all empties the cart after confirming", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     renderWithCart(<CartView isSignedIn />);
-    fireEvent.click(await screen.findByRole("button", { name: "Clear all" }));
-    expect(screen.getByText("Your cart is empty.")).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "Clear All" }));
+    expect(screen.getByRole("heading", { name: "Your cart is waiting" })).toBeInTheDocument();
     expect(localStorage.getItem("kb-cart")).toBeNull();
   });
 
   it("Clear all does nothing if the customer backs out", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(false);
     renderWithCart(<CartView isSignedIn />);
-    fireEvent.click(await screen.findByRole("button", { name: "Clear all" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Clear All" }));
     expect(screen.getByText("Kopi")).toBeInTheDocument();
   });
 });

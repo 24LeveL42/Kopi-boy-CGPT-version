@@ -109,6 +109,11 @@ export default async function OrdersPage() {
                           <p className="mt-0.5 text-xs" style={{ color: "var(--kb-ink-soft)" }}>
                             {formatTimestamp(order.created_at)}
                           </p>
+                          {order.scheduled_for && (
+                            <p data-testid="order-history-scheduled" className="mt-0.5 text-xs font-semibold">
+                              Scheduled for {formatTimestamp(order.scheduled_for)}
+                            </p>
+                          )}
                         </div>
                         <span className="shrink-0 text-sm font-semibold">${order.subtotal.toFixed(2)}</span>
                       </div>
