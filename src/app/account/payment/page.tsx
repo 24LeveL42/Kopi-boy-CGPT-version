@@ -1,19 +1,26 @@
 import type { Metadata } from "next";
 import { BottomNav } from "@/components/BottomNav";
+import { createClient } from "@/lib/supabase/server";
+import { getPaymentWindowMinutes, paymentWindowText } from "@/lib/payment-proof";
 
 export const metadata: Metadata = {
   title: "Payment method — Kopi Boy",
 };
 
-const STEPS = [
+/** paymentWindow: "within 5 minutes", from the database setting (public.payment_window_minutes()). */
+const steps = (paymentWindow: string) => [
   { title: "Place your order", body: "Nothing is charged when you order." },
   { title: "The cook accepts", body: "Your order page then shows the kitchen's PayNow number or UEN and the amount to pay." },
   { title: "Pay the kitchen by PayNow", body: "Use your own banking app to pay the kitchen directly." },
-  { title: "Send your proof of payment", body: "Upload a screenshot of the PayNow transfer on your order page. The cook checks it and starts preparing your food." },
+  {
+    title: "Send your proof of payment",
+    body: `Upload a screenshot of the PayNow transfer on your order page ${paymentWindow} of the cook accepting, or the order is cancelled automatically. The cook checks it and starts preparing your food.`,
+  },
 ];
 
 /** Informational only: there's nothing to set up, and nothing about the customer's payment is stored. */
-export default function PaymentMethodPage() {
+export default async function PaymentMethodPage() {
+  const paymentWindowMinutes = await getPaymentWindowMinutes(await createClient());
   return (
     <div className="kb-app-shell min-h-screen pb-28">
       <main className="mx-auto max-w-md px-4 py-6 sm:px-6">
@@ -28,7 +35,7 @@ export default function PaymentMethodPage() {
         <section className="kb-cart-card mt-5">
           <p className="text-xs font-black uppercase tracking-[.14em] text-purple-600">How paying works</p>
           <ol className="mt-3 space-y-3">
-            {STEPS.map((step, i) => (
+            {steps(paymentWindowText(paymentWindowMinutes)).map((step, i) => (
               <li key={step.title} className="flex gap-3">
                 <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-purple-100 text-xs font-black text-purple-700">{i + 1}</span>
                 <div>

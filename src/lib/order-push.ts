@@ -8,6 +8,7 @@
  * deliberately generic: no kitchen name, address, phone, amount or PayNow
  * details — only a short title, one line, and the order's own page.
  */
+import { NOT_PAID_IN_TIME, paymentWindowText } from "@/lib/payment-proof";
 
 export const ORDER_PUSH_EVENTS = [
   "order_accepted",
@@ -21,11 +22,17 @@ export const ORDER_PUSH_EVENTS = [
 
 export type OrderPushEvent = (typeof ORDER_PUSH_EVENTS)[number];
 
+/** The minutes come from public.payment_window_minutes(); null = it couldn't be read. */
+export function orderAcceptedBody(paymentWindowMinutes: number | null): string {
+  return `Your order was accepted. Pay now and send your proof ${paymentWindowText(paymentWindowMinutes)}.`;
+}
+
+/** order_cancelled when the auto-cancel job cancelled it (orders.cancel_reason = 'not_paid_in_time'). */
+export const NOT_PAID_IN_TIME_BODY = "Your order was cancelled because your payment wasn't received in time.";
+
+/** The default line per event; order_accepted's minutes and an unpaid cancel are filled in by buildOrderPushPayload. */
 export const ORDER_PUSH_MESSAGES: Record<OrderPushEvent, { title: string; body: string }> = {
-  order_accepted: {
-    title: "Order accepted",
-    body: "Your order was accepted. Pay now and send your proof within 15 minutes.",
-  },
+  order_accepted: { title: "Order accepted", body: orderAcceptedBody(null) },
   order_cancelled: { title: "Order cancelled", body: "Your order was cancelled." },
   payment_received: { title: "Payment received", body: "Payment received. Your food is being prepared." },
   payment_not_received: {
@@ -71,10 +78,19 @@ export function isUuid(value: unknown): value is string {
   return typeof value === "string" && UUID_RE.test(value);
 }
 
+/** What the sender looked up about the order, for the two lines that depend on it. */
+export interface OrderPushDetails {
+  paymentWindowMinutes?: number | null;
+  cancelReason?: string | null;
+}
+
 /** The push for an event, or null when the event isn't one that sends a push. */
-export function buildOrderPushPayload(event: unknown, orderId: string): OrderPushPayload | null {
+export function buildOrderPushPayload(event: unknown, orderId: string, details: OrderPushDetails = {}): OrderPushPayload | null {
   if (!isOrderPushEvent(event) || !isUuid(orderId)) return null;
-  const { title, body } = ORDER_PUSH_MESSAGES[event];
+  const { title } = ORDER_PUSH_MESSAGES[event];
+  let { body } = ORDER_PUSH_MESSAGES[event];
+  if (event === "order_accepted") body = orderAcceptedBody(details.paymentWindowMinutes ?? null);
+  if (event === "order_cancelled" && details.cancelReason === NOT_PAID_IN_TIME) body = NOT_PAID_IN_TIME_BODY;
   return {
     title,
     body,

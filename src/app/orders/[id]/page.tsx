@@ -14,6 +14,7 @@ import { OrderRating, RateOrder } from "@/components/RateOrder";
 import { PaymentProofCard } from "@/components/PaymentProofCard";
 import { PushPrompt } from "@/components/PushNotifications";
 import {
+  NOT_PAID_IN_TIME,
   PAYMENT_PROOF_BUCKET,
   PAYMENT_PROOF_URL_TTL_SECONDS,
   getPaymentProofState,
@@ -47,6 +48,11 @@ export interface OrderRow {
   payment_proof_path?: string | null;
   payment_proof_uploaded_at?: string | null;
   payment_proof_rejected_at?: string | null;
+  /** Payment deadline and why an order was cancelled (docs/supabase-order-timers.sql); absent before it runs. */
+  payment_due_at?: string | null;
+  cancel_reason?: string | null;
+  /** Set when the screenshot was deleted after the retention period. */
+  payment_proof_removed_at?: string | null;
 }
 
 interface OrderItemRow {
@@ -100,7 +106,8 @@ export function pickActiveDelivery(deliveries: DeliveryRequestRow[]): DeliveryRe
  */
 export function getStage(order: OrderRow, activeDelivery: DeliveryRequestRow | null): Stage {
   if (order.order_status === "cancelled") {
-    return { message: "Order was cancelled", at: order.decided_at, tone: "danger", position: null };
+    const message = order.cancel_reason === NOT_PAID_IN_TIME ? "Cancelled — payment not received in time" : "Order was cancelled";
+    return { message, at: order.decided_at, tone: "danger", position: null };
   }
   if (order.order_status === "rejected") {
     return { message: "Order was rejected", at: order.decided_at, tone: "danger", position: null };
@@ -140,7 +147,18 @@ export function getStage(order: OrderRow, activeDelivery: DeliveryRequestRow | n
  * rejected order leads with a red X and says so, instead of celebrating an
  * order that will never be made.
  */
-export function getHeader(orderStatus: string, kitchenName: string): { title: string; subtitle: string; failed: boolean } {
+export function getHeader(
+  orderStatus: string,
+  kitchenName: string,
+  cancelReason?: string | null
+): { title: string; subtitle: string; failed: boolean } {
+  if (orderStatus === "cancelled" && cancelReason === NOT_PAID_IN_TIME) {
+    return {
+      title: "Order cancelled",
+      subtitle: "Your payment wasn't received in time, so this order was cancelled.",
+      failed: true,
+    };
+  }
   if (orderStatus === "cancelled") {
     return { title: "Order cancelled", subtitle: "The kitchen won't prepare this order.", failed: true };
   }
@@ -246,7 +264,7 @@ export default async function OrderConfirmationPage({
   const activeDelivery = pickActiveDelivery(deliveries ?? []);
   const stage = getStage(order, activeDelivery);
   const stageTimestamp = formatTimestamp(stage.at);
-  const header = getHeader(order.order_status, kitchen?.business_name ?? "The kitchen");
+  const header = getHeader(order.order_status, kitchen?.business_name ?? "The kitchen", order.cancel_reason);
 
   // Rider name + photo, once a rider has accepted (or finished) the delivery.
   // profiles RLS hides other users' rows from customers, so this goes through
@@ -409,8 +427,9 @@ export default async function OrderConfirmationPage({
                 getPaynowInstruction(kitchen?.paynow_type ?? null, kitchen?.paynow_value ?? null) ?? "Pay the cook via PayNow"
               }
               amount={total}
-              decidedAt={order.decided_at}
+              paymentDueAt={order.payment_due_at ?? null}
               proofUrl={paymentProofUrl}
+              proofRemoved={Boolean(order.payment_proof_removed_at)}
             />
           ) : !header.failed && (
             <p className="mt-1.5 text-xs" style={{ color: "var(--kb-ink-soft)" }}>

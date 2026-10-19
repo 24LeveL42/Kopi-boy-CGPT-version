@@ -12,8 +12,9 @@ worded by `src/lib/order-push.ts`. Nothing else sends one.
 
 | Change (real columns) | Push |
 |---|---|
-| `orders.order_status` → `accepted` | Your order was accepted. Pay now and send your proof within 15 minutes. |
-| `orders.order_status` → `rejected` or `cancelled` | Your order was cancelled. |
+| `orders.order_status` → `accepted` | Your order was accepted. Pay now and send your proof within 5 minutes. (the number is `public.payment_window_minutes()`; "within a few minutes" if it can't be read) |
+| `orders.order_status` → `cancelled` with `cancel_reason = 'not_paid_in_time'` (the auto-cancel job, `docs/supabase-order-timers.sql`) | Your order was cancelled because your payment wasn't received in time. |
+| `orders.order_status` → `rejected` or `cancelled` (any other reason) | Your order was cancelled. |
 | `orders.payment_status` → `paid` | Payment received. Your food is being prepared. |
 | `orders.payment_proof_rejected_at` set to a new time (still accepted + unpaid) | Your payment wasn't received. Please check and send your proof again. |
 | `delivery_requests.status` → `accepted` | A rider is on the way to pick up your order. |

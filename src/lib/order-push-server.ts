@@ -2,6 +2,7 @@ import "server-only";
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildOrderPushPayload, isOrderPushEvent, isUuid, orderPushDedupeKey } from "@/lib/order-push";
+import { getPaymentWindowMinutes } from "@/lib/payment-proof";
 
 /**
  * Handler behind POST /api/push/order-update. Called by the database
@@ -77,20 +78,25 @@ export async function handleOrderPushWebhook(request: Request, deps: OrderPushDe
   if (!isUuid(orderId) || !isOrderPushEvent(event)) {
     return json({ error: "Unknown order or event" }, 400);
   }
-  const payload = buildOrderPushPayload(event, orderId)!;
-
   const admin = deps.createAdmin(env.NEXT_PUBLIC_SUPABASE_URL.trim(), env.SUPABASE_SERVICE_ROLE_KEY.trim());
 
+  // "*": cancel_reason only exists once docs/supabase-order-timers.sql has
+  // run, and naming it would fail the lookup (and every push) before that.
   const { data: order, error: orderError } = await admin
     .from("orders")
-    .select("customer_id")
+    .select("*")
     .eq("id", orderId)
-    .maybeSingle<{ customer_id: string }>();
+    .maybeSingle<{ customer_id: string; cancel_reason?: string | null }>();
   if (orderError) {
     console.error("order push: loading order failed:", orderError);
     return json({ error: "Could not load order", code: orderError.code, message: orderError.message }, 500);
   }
   if (!order) return json({ skipped: "order not found" });
+
+  const payload = buildOrderPushPayload(event, orderId, {
+    paymentWindowMinutes: event === "order_accepted" ? await getPaymentWindowMinutes(admin) : null,
+    cancelReason: order.cancel_reason ?? null,
+  })!;
 
   // Once-only: the first delivery of a change claims its key; a repeat (a
   // re-sent webhook, a retried request) hits the unique key and stops here.

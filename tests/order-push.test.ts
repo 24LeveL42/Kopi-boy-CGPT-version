@@ -34,7 +34,9 @@ interface SubRow {
  * Just the supabase-js calls the handler makes, backed by in-memory tables.
  * customer_push_log enforces its primary key the way Postgres does (23505).
  */
-function createFakeAdmin(opts: { subs?: SubRow[]; orderCustomer?: string | null } = {}) {
+function createFakeAdmin(
+  opts: { subs?: SubRow[]; orderCustomer?: string | null; cancelReason?: string | null; windowMinutes?: number | null } = {}
+) {
   const state = {
     log: new Set<string>(),
     subs: [...(opts.subs ?? [])],
@@ -43,13 +45,19 @@ function createFakeAdmin(opts: { subs?: SubRow[]; orderCustomer?: string | null 
   const orderCustomer = opts.orderCustomer === undefined ? CUSTOMER_ID : opts.orderCustomer;
 
   const client = {
+    rpc: async (fn: string) => {
+      if (fn !== "payment_window_minutes") throw new Error(`unexpected rpc ${fn}`);
+      return opts.windowMinutes == null
+        ? { data: null, error: { message: "function public.payment_window_minutes() does not exist" } }
+        : { data: opts.windowMinutes, error: null };
+    },
     from(table: string) {
       if (table === "orders") {
         return {
           select: () => ({
             eq: (_col: string, id: string) => ({
               maybeSingle: async () => ({
-                data: id === ORDER_ID && orderCustomer ? { customer_id: orderCustomer } : null,
+                data: id === ORDER_ID && orderCustomer ? { customer_id: orderCustomer, cancel_reason: opts.cancelReason ?? null } : null,
                 error: null,
               }),
             }),
@@ -110,7 +118,7 @@ function makeDeps(admin: SupabaseClient, send: OrderPushDeps["send"] = vi.fn(asy
 
 describe("event → message mapping", () => {
   it.each([
-    ["order_accepted", "Your order was accepted. Pay now and send your proof within 15 minutes."],
+    ["order_accepted", "Your order was accepted. Pay now and send your proof within a few minutes."],
     ["order_cancelled", "Your order was cancelled."],
     ["payment_received", "Payment received. Your food is being prepared."],
     ["payment_not_received", "Your payment wasn't received. Please check and send your proof again."],
@@ -127,6 +135,25 @@ describe("event → message mapping", () => {
       icon: "/brand/logo-icon.png",
       badge: "/notification-badge.png",
     });
+  });
+
+  it("takes the time to pay from the database setting", () => {
+    expect(buildOrderPushPayload("order_accepted", ORDER_ID, { paymentWindowMinutes: 5 })?.body).toBe(
+      "Your order was accepted. Pay now and send your proof within 5 minutes."
+    );
+    expect(buildOrderPushPayload("order_accepted", ORDER_ID, { paymentWindowMinutes: 1 })?.body).toBe(
+      "Your order was accepted. Pay now and send your proof within 1 minute."
+    );
+  });
+
+  it("says why when the order was cancelled for not paying in time, and nothing extra otherwise", () => {
+    expect(buildOrderPushPayload("order_cancelled", ORDER_ID, { cancelReason: "not_paid_in_time" })?.body).toBe(
+      "Your order was cancelled because your payment wasn't received in time."
+    );
+    expect(buildOrderPushPayload("order_cancelled", ORDER_ID, { cancelReason: null })?.body).toBe("Your order was cancelled.");
+    expect(buildOrderPushPayload("payment_received", ORDER_ID, { cancelReason: "not_paid_in_time" })?.body).toBe(
+      "Payment received. Your food is being prepared."
+    );
   });
 
   it("covers exactly the seven push events", () => {
@@ -167,10 +194,12 @@ describe("event → message mapping", () => {
   });
 
   it("keeps titles short and generic", () => {
-    for (const event of ORDER_PUSH_EVENTS) {
-      const { title, body } = buildOrderPushPayload(event, ORDER_ID)!;
-      expect(title.length).toBeLessThanOrEqual(30);
-      expect(body.length).toBeLessThanOrEqual(80);
+    for (const details of [{}, { paymentWindowMinutes: 120, cancelReason: "not_paid_in_time" }]) {
+      for (const event of ORDER_PUSH_EVENTS) {
+        const { title, body } = buildOrderPushPayload(event, ORDER_ID, details)!;
+        expect(title.length).toBeLessThanOrEqual(30);
+        expect(body.length).toBeLessThanOrEqual(80);
+      }
     }
   });
 });
@@ -257,6 +286,45 @@ describe("POST /api/push/order-update — sending", () => {
       icon: "/brand/logo-icon.png",
       badge: "/notification-badge.png",
     });
+  });
+});
+
+describe("POST /api/push/order-update — payment deadline wording", () => {
+  it("words order_accepted with the database's payment window", async () => {
+    const { client } = createFakeAdmin({ subs: [sub("s1")], windowMinutes: 5 });
+    const send = vi.fn<OrderPushDeps["send"]>(async () => ({}));
+    const { deps } = makeDeps(client, send);
+    await handleOrderPushWebhook(webhook({ order_id: ORDER_ID, event: "order_accepted" }), deps);
+    expect(JSON.parse(send.mock.calls[0][1]).body).toBe("Your order was accepted. Pay now and send your proof within 5 minutes.");
+  });
+
+  it("falls back to 'within a few minutes' when the setting can't be read", async () => {
+    const { client } = createFakeAdmin({ subs: [sub("s1")], windowMinutes: null });
+    const send = vi.fn<OrderPushDeps["send"]>(async () => ({}));
+    const { deps } = makeDeps(client, send);
+    await handleOrderPushWebhook(webhook({ order_id: ORDER_ID, event: "order_accepted" }), deps);
+    expect(JSON.parse(send.mock.calls[0][1]).body).toBe(
+      "Your order was accepted. Pay now and send your proof within a few minutes."
+    );
+  });
+
+  it("says the payment wasn't received in time for an auto-cancelled order", async () => {
+    const { client } = createFakeAdmin({ subs: [sub("s1")], cancelReason: "not_paid_in_time" });
+    const send = vi.fn<OrderPushDeps["send"]>(async () => ({}));
+    const { deps } = makeDeps(client, send);
+    await handleOrderPushWebhook(webhook({ order_id: ORDER_ID, event: "order_cancelled" }), deps);
+    expect(JSON.parse(send.mock.calls[0][1])).toMatchObject({
+      title: "Order cancelled",
+      body: "Your order was cancelled because your payment wasn't received in time.",
+    });
+  });
+
+  it("keeps the plain line for any other cancellation", async () => {
+    const { client } = createFakeAdmin({ subs: [sub("s1")], cancelReason: null });
+    const send = vi.fn<OrderPushDeps["send"]>(async () => ({}));
+    const { deps } = makeDeps(client, send);
+    await handleOrderPushWebhook(webhook({ order_id: ORDER_ID, event: "order_cancelled" }), deps);
+    expect(JSON.parse(send.mock.calls[0][1]).body).toBe("Your order was cancelled.");
   });
 });
 

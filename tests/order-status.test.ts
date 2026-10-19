@@ -91,6 +91,12 @@ describe("getStage", () => {
     expect(stage.tone).toBe("danger");
   });
 
+  it("says the payment wasn't received in time when the order was auto-cancelled", () => {
+    const decidedAt = "2026-01-01T00:12:00.000Z";
+    const stage = getStage(order({ order_status: "cancelled", cancel_reason: "not_paid_in_time", decided_at: decidedAt }), null);
+    expect(stage).toEqual({ message: "Cancelled — payment not received in time", at: decidedAt, tone: "danger", position: null });
+  });
+
   it("shows 'Order was rejected' as a terminal state, timestamped at decided_at", () => {
     const decidedAt = "2026-01-01T00:02:00.000Z";
     const stage = getStage(order({ order_status: "rejected", decided_at: decidedAt }), null);
@@ -136,6 +142,15 @@ describe("getHeader", () => {
       subtitle: "The kitchen won't prepare this order.",
       failed: true,
     });
+  });
+
+  it("explains an order cancelled for not paying in time", () => {
+    expect(getHeader("cancelled", "Aunty May", "not_paid_in_time")).toEqual({
+      title: "Order cancelled",
+      subtitle: "Your payment wasn't received in time, so this order was cancelled.",
+      failed: true,
+    });
+    expect(getHeader("cancelled", "Aunty May", null).subtitle).toBe("The kitchen won't prepare this order.");
   });
 
   it("says 'Order declined' for a rejected order", () => {

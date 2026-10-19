@@ -7,7 +7,9 @@ import { orderChatPhotoPath } from "@/lib/messages";
 import { useIsClient } from "@/lib/use-is-client";
 import { Spinner } from "@/components/Spinner";
 import {
+  NOT_PAID_IN_TIME_UPLOAD_ERROR,
   PAYMENT_PROOF_BUCKET,
+  PAYMENT_PROOF_RETENTION_DAYS,
   PAYMENT_PROOF_TYPES,
   formatCountdown,
   paymentTimeLeftMs,
@@ -29,8 +31,9 @@ export function PaymentProofCard({
   state,
   paynowLine,
   amount,
-  decidedAt,
+  paymentDueAt,
   proofUrl,
+  proofRemoved = false,
 }: {
   orderId: string;
   userId: string;
@@ -38,9 +41,12 @@ export function PaymentProofCard({
   /** e.g. "Pay via PayNow to UEN 123" — the existing PayNow display. */
   paynowLine: string;
   amount: number;
-  decidedAt: string | null;
+  /** orders.payment_due_at, set by the database when the cook accepts; null on older orders. */
+  paymentDueAt: string | null;
   /** Signed URL of the uploaded screenshot (state "sent"). */
   proofUrl: string | null;
+  /** The screenshot was deleted by the retention purge (orders.payment_proof_removed_at). */
+  proofRemoved?: boolean;
 }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -73,6 +79,12 @@ export function PaymentProofCard({
         return;
       }
       const { error: rpcError } = await supabase.rpc("submit_payment_proof", { p_order_id: orderId, p_path: path });
+      if (rpcError?.message.includes(NOT_PAID_IN_TIME_UPLOAD_ERROR)) {
+        // Too late: the order was cancelled first. Say so, and show the cancelled page.
+        setError(`${NOT_PAID_IN_TIME_UPLOAD_ERROR}.`);
+        router.refresh();
+        return;
+      }
       if (rpcError) {
         setError(`Your screenshot uploaded but couldn't be sent to the cook: ${rpcError.message}. Please try again.`);
         return;
@@ -111,16 +123,23 @@ export function PaymentProofCard({
     </p>
   );
 
+  const removedNote = proofRemoved && (
+    <p data-testid="payment-proof-removed" className="mt-2 text-xs" style={{ color: "var(--kb-ink-soft)" }}>
+      Proof removed after {PAYMENT_PROOF_RETENTION_DAYS} days
+    </p>
+  );
+
   if (state === "paid") {
     return (
-      <p
-        data-testid="payment-proof-card"
-        data-state="paid"
-        className="mt-3 inline-block rounded-full px-3 py-1 text-xs font-semibold"
-        style={{ background: "rgba(4,120,87,0.12)", color: "var(--kb-green-deep)" }}
-      >
-        Payment confirmed ✓
-      </p>
+      <div data-testid="payment-proof-card" data-state="paid" className="mt-3">
+        <p
+          className="inline-block rounded-full px-3 py-1 text-xs font-semibold"
+          style={{ background: "rgba(4,120,87,0.12)", color: "var(--kb-green-deep)" }}
+        >
+          Payment confirmed ✓
+        </p>
+        {removedNote}
+      </div>
     );
   }
 
@@ -135,7 +154,8 @@ export function PaymentProofCard({
         <p className="font-bold" style={{ color: "var(--kb-green-deep)" }}>
           Proof sent ✓ Waiting for the cook to confirm your payment
         </p>
-        {proofUrl && (
+        {removedNote}
+        {proofUrl && !proofRemoved && (
           <a href={proofUrl} target="_blank" rel="noopener noreferrer" className="mt-3 block w-24">
             {/* Short-lived signed URL from a private bucket — next/image can't (and shouldn't) cache it. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -193,7 +213,7 @@ export function PaymentProofCard({
         Action needed: pay and send proof of payment
       </p>
       <div className="p-4">
-        <PayCountdown decidedAt={decidedAt} />
+        <PayCountdown paymentDueAt={paymentDueAt} />
         <ol className="space-y-4">
           <Step n={1} title="Pay via PayNow">
             <p className="font-semibold">{paynowLine}</p>
@@ -237,8 +257,12 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
   );
 }
 
-/** Display only: counts down 15 min from decided_at. Rendered client-side only, so server and client never disagree on the seconds. */
-function PayCountdown({ decidedAt }: { decidedAt: string | null }) {
+/**
+ * Counts down to orders.payment_due_at. The database decides the deadline and
+ * does the cancelling; this is only the display. Rendered client-side only, so
+ * server and client never disagree on the seconds.
+ */
+function PayCountdown({ paymentDueAt }: { paymentDueAt: string | null }) {
   const isClient = useIsClient();
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -246,12 +270,12 @@ function PayCountdown({ decidedAt }: { decidedAt: string | null }) {
     return () => clearInterval(tick);
   }, []);
 
-  const left = paymentTimeLeftMs(decidedAt, now);
+  const left = paymentTimeLeftMs(paymentDueAt, now);
   if (!isClient || left === null) return null;
   if (left <= 0) {
     return (
       <p data-testid="payment-countdown" className="mb-3 rounded-xl px-3 py-2 text-sm font-semibold" style={{ background: "rgba(239,68,68,0.12)", color: "var(--kb-danger)" }}>
-        Payment window has passed. Please contact the cook.
+        Time to pay is up. Upload your proof now, or your order will be cancelled.
       </p>
     );
   }

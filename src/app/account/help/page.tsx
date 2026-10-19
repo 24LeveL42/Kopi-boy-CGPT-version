@@ -6,19 +6,21 @@ import { LegalLinks } from "@/components/LegalLinks";
 import { SupportMessageForm } from "@/components/SupportMessageForm";
 import { ASAP_ETA_MINUTES, MIN_LEAD_MINUTES, MAX_AHEAD_DAYS } from "@/lib/delivery-time";
 import { MAX_ADDRESSES } from "@/lib/addresses";
+import { getPaymentWindowMinutes, paymentWindowText } from "@/lib/payment-proof";
 
 export const metadata: Metadata = {
   title: "Help & support — Kopi Boy",
 };
 
-const FAQ: { q: string; a: string }[] = [
+/** paymentWindow: "within 5 minutes", from the database setting (public.payment_window_minutes()). */
+const faq = (paymentWindow: string): { q: string; a: string }[] => [
   {
     q: "How do I place an order?",
     a: `Add dishes from one kitchen to your cart, then tap Proceed to Checkout. Choose where to deliver, Normal or Express, and when: as soon as possible, or a time at least ${MIN_LEAD_MINUTES} minutes ahead within the next ${MAX_AHEAD_DAYS} days. Tap Confirm Order and the kitchen will accept or decline it.`,
   },
   {
     q: "How do I pay by PayNow?",
-    a: "Once the cook accepts, your order page shows the kitchen's PayNow number or UEN and the total. Pay the kitchen from your banking app within 15 minutes, then upload a screenshot of the transfer on the order page. Kopi Boy never holds your money.",
+    a: `Once the cook accepts, your order page shows the kitchen's PayNow number or UEN and the total. Pay the kitchen from your banking app and upload a screenshot of the transfer on the order page ${paymentWindow}. If no proof arrives in time, the order is cancelled automatically. Kopi Boy never holds your money.`,
   },
   {
     q: "Why is the delivery fee an estimate?",
@@ -44,9 +46,12 @@ const FAQ: { q: string; a: string }[] = [
 
 export default async function HelpPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const [
+    {
+      data: { user },
+    },
+    paymentWindowMinutes,
+  ] = await Promise.all([supabase.auth.getUser(), getPaymentWindowMinutes(supabase)]);
 
   return (
     <div className="kb-app-shell min-h-screen pb-28">
@@ -60,7 +65,7 @@ export default async function HelpPage() {
         </div>
 
         <section className="kb-profile-menu mt-5" data-testid="help-faq">
-          {FAQ.map((item) => (
+          {faq(paymentWindowText(paymentWindowMinutes)).map((item) => (
             <details key={item.q} className="group border-b border-[#f0eef3] last:border-b-0">
               <summary className="kb-profile-link cursor-pointer list-none border-b-0">
                 <span>{item.q}</span>
