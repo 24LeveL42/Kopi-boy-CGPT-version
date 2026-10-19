@@ -124,6 +124,8 @@ describe("event → message mapping", () => {
       body,
       url: `/orders/${ORDER_ID}`,
       tag: `order-${ORDER_ID}`,
+      icon: "/brand/logo-icon.png",
+      badge: "/notification-badge.png",
     });
   });
 
@@ -147,6 +149,8 @@ describe("event → message mapping", () => {
       body: "Your rider has collected your food and is on the way to deliver it.",
       url: `/orders/${ORDER_ID}`,
       tag: `order-${ORDER_ID}`,
+      icon: "/brand/logo-icon.png",
+      badge: "/notification-badge.png",
     });
     expect(buildOrderPushPayload("rider_on_the_way", ORDER_ID)?.body).toBe("A rider is on the way to pick up your order.");
   });
@@ -250,6 +254,8 @@ describe("POST /api/push/order-update — sending", () => {
       body: "Payment received. Your food is being prepared.",
       url: `/orders/${ORDER_ID}`,
       tag: `order-${ORDER_ID}`,
+      icon: "/brand/logo-icon.png",
+      badge: "/notification-badge.png",
     });
   });
 });
@@ -269,6 +275,8 @@ describe("POST /api/push/order-update — order_picked_up", () => {
       body: "Your rider has collected your food and is on the way to deliver it.",
       url: `/orders/${ORDER_ID}`,
       tag: `order-${ORDER_ID}`,
+      icon: "/brand/logo-icon.png",
+      badge: "/notification-badge.png",
     });
   });
 

@@ -1,7 +1,20 @@
 /* Kopi Boy — service worker. Shows order-update Web Push; no offline caching. */
 
+// Bump on every change so installed phones pick up the new worker (it's also
+// served no-store, see next.config.ts).
+const SW_VERSION = "2026-10-19.1";
+
+// Full-colour KB logo inside the notification, and the white-on-transparent
+// KB that Android shows in the status bar (only its alpha is used). Same paths
+// as NOTIFICATION_ICON / NOTIFICATION_BADGE in src/lib/order-push.ts.
+const NOTIFICATION_ICON = "/brand/logo-icon.png";
+const NOTIFICATION_BADGE = "/notification-badge.png";
+
 self.addEventListener("install", () => self.skipWaiting());
-self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
+self.addEventListener("activate", (event) => {
+  console.info("Kopi Boy service worker", SW_VERSION);
+  event.waitUntil(self.clients.claim());
+});
 
 // Only same-origin order pages (or home) are ever opened from a notification.
 function safeUrl(url) {
@@ -12,6 +25,11 @@ function safeUrl(url) {
   } catch {
     return "/";
   }
+}
+
+// A payload image may only be one of our own files.
+function safeAsset(path, fallback) {
+  return typeof path === "string" && /^\/(?!\/)[\w./-]+\.png$/.test(path) ? path : fallback;
 }
 
 self.addEventListener("push", (event) => {
@@ -30,7 +48,8 @@ self.addEventListener("push", (event) => {
     self.registration
       .showNotification(title, {
         body: data.body || "",
-        icon: "/icons/icon-192.png",
+        icon: safeAsset(data.icon, NOTIFICATION_ICON),
+        badge: safeAsset(data.badge, NOTIFICATION_BADGE),
         tag: data.tag || undefined,
         renotify: !!data.tag,
         data: { url: safeUrl(data.url) },

@@ -43,12 +43,22 @@ export const ORDER_PUSH_MESSAGES: Record<OrderPushEvent, { title: string; body: 
   order_delivered: { title: "Order delivered", body: "Your order was delivered. Enjoy!" },
 };
 
+/** Full-colour KB logo shown inside the notification. public/sw.js falls back to the same paths. */
+export const NOTIFICATION_ICON = "/brand/logo-icon.png";
+/**
+ * Android status-bar icon: a white KB shape on transparent (only the alpha is
+ * used). Without it Android shows a generic bell.
+ */
+export const NOTIFICATION_BADGE = "/notification-badge.png";
+
 export interface OrderPushPayload {
   title: string;
   body: string;
   url: string;
   /** One notification per order on the device: a newer update replaces the older one. */
   tag: string;
+  icon: string;
+  badge: string;
 }
 
 export function isOrderPushEvent(value: unknown): value is OrderPushEvent {
@@ -65,7 +75,14 @@ export function isUuid(value: unknown): value is string {
 export function buildOrderPushPayload(event: unknown, orderId: string): OrderPushPayload | null {
   if (!isOrderPushEvent(event) || !isUuid(orderId)) return null;
   const { title, body } = ORDER_PUSH_MESSAGES[event];
-  return { title, body, url: `/orders/${orderId}`, tag: `order-${orderId}` };
+  return {
+    title,
+    body,
+    url: `/orders/${orderId}`,
+    tag: `order-${orderId}`,
+    icon: NOTIFICATION_ICON,
+    badge: NOTIFICATION_BADGE,
+  };
 }
 
 /**
