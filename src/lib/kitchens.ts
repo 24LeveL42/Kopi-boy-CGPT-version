@@ -53,7 +53,7 @@ const CATEGORY_FALLBACK_IMAGE: Record<Merchant["category"], string> = {
 /**
  * The kitchen columns a customer may read. Deliberately never
  * business_address: a kitchen's street address (often a home cook's home)
- * is for the rider/picker assigned to an order, not for customers — only
+ * is for the rider assigned to an order, not for customers — only
  * postal_code is shown. And never "*": once the Partner app revokes SELECT
  * on business_address, `select *` fails the whole query ("permission
  * denied") instead of skipping that one column.

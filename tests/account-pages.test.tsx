@@ -14,6 +14,7 @@ import AccountPage from "@/app/account/page";
 import PaymentMethodPage from "@/app/account/payment/page";
 import AboutPage from "@/app/account/about/page";
 import HelpPage from "@/app/account/help/page";
+import { ORDER_PUSH_MESSAGES } from "@/lib/order-push";
 
 const inApp = (ui: React.ReactNode) => render(<CartProvider>{ui}</CartProvider>);
 afterEach(cleanup);
@@ -69,5 +70,24 @@ describe("Help & Support", () => {
     inApp(await HelpPage());
     expect(screen.queryByTestId("support-message-form")).toBeNull();
     expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
+  });
+});
+
+describe("Roles customers see", () => {
+  // Kopi Boy has cooks and riders only; there is no picker / pick-up partner role.
+  const PICKER = /pickers?|pick-?up partners?/i;
+
+  it("never mentions pickers on Profile, Payment, About or Help", async () => {
+    for (const page of [await AccountPage(), <PaymentMethodPage key="pay" />, <AboutPage key="about" />, await HelpPage()]) {
+      inApp(page);
+      expect(document.body.textContent).not.toMatch(PICKER);
+      cleanup();
+    }
+  });
+
+  it("never mentions pickers in push notifications", () => {
+    for (const { title, body } of Object.values(ORDER_PUSH_MESSAGES)) {
+      expect(`${title} ${body}`).not.toMatch(PICKER);
+    }
   });
 });

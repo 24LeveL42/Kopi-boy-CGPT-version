@@ -31,7 +31,7 @@ never re-notifies.
 ## The table is shared with the Partner app
 
 `public.notifications` is **one table used by both apps**. The Partner app's
-`docs/supabase-notifications.sql` creates it first for cooks/riders/pickers, and
+`docs/supabase-notifications.sql` creates it first for cooks and riders, and
 the columns are theirs: `category`, free-text `type`, `title`, `body`, `url`,
 `ref_id`, `read_at`, `created_at` — **there is no `order_id` column**. For a
 customer notification `ref_id` is the order and `url` is `/orders/<id>` (a tap

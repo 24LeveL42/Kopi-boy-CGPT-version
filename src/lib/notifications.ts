@@ -19,7 +19,7 @@ export type NotificationType =
   | "order_delivered"
   | "order_cancelled";
 
-export type NotificationCategory = "orders" | "deliveries" | "pickups" | "account";
+export type NotificationCategory = "orders" | "deliveries" | "account";
 
 export interface NotificationRow {
   id: string;
