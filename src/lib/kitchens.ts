@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { Merchant } from "@/lib/types";
 import { sortAvailableFirst } from "@/lib/kitchen-availability";
+import { isNewKitchen } from "@/lib/new-kitchens";
 
 type ServerSupabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -82,6 +83,34 @@ export async function selectKitchens<R extends { error: { code?: string; message
 }
 
 /**
+ * When each kitchen went live, for the NEW rule: kitchens.live_since where
+ * that column exists and is set, else created_at. Read on its own so a
+ * missing column (42703) only drops back to created_at, and any other error
+ * (e.g. the column isn't granted to customers) means no kitchen counts as
+ * new — the marketplace itself never fails over it.
+ */
+export async function loadLiveSince(supabase: ServerSupabase, kitchenIds: string[]): Promise<Map<string, string>> {
+  for (const columns of ["id, live_since, created_at", "id, created_at"]) {
+    const { data, error } = await supabase
+      .from("kitchens")
+      .select(columns)
+      .in("id", kitchenIds)
+      .returns<{ id: string; live_since?: string | null; created_at?: string | null }[]>();
+    if (error) {
+      if (error.code === "42703") continue;
+      break;
+    }
+    const since = new Map<string, string>();
+    for (const k of data ?? []) {
+      const at = k.live_since ?? k.created_at;
+      if (at) since.set(k.id, at);
+    }
+    return since;
+  }
+  return new Map();
+}
+
+/**
  * The only location a customer sees for a kitchen: "Postal sector 31", from
  * the first two digits of postal_code — never the full 6-digit code. Works
  * whether the Partner app exposes the full code or already only the sector.
@@ -103,7 +132,8 @@ export function formatKitchenArea(postalCode: string | null | undefined): string
  * latitude/longitude passed through below. Ratings come from the
  * kitchen_rating_summary view (schema section 32); if that hasn't been
  * created yet the query errors and every kitchen just shows "No ratings
- * yet". `isNew` is still a placeholder (true for every kitchen). `demo-data.ts` (Feature #001) is no
+ * yet". `isNew` follows the NEW rule (src/lib/new-kitchens.ts) from
+ * loadLiveSince. `demo-data.ts` (Feature #001) is no
  * longer used for the live home page; kept only for the test fixtures.
  */
 export async function getLiveMerchants(): Promise<Merchant[]> {
@@ -116,35 +146,26 @@ export async function getLiveMerchants(): Promise<Merchant[]> {
   if (kitchensError) throw new Error(`Failed to load kitchens: ${kitchensError.message}`);
   if (!kitchens || kitchens.length === 0) return [];
 
-  const { data: items, error: itemsError } = await supabase
-    .from("menu_items")
-    .select("*")
-    .in(
-      "kitchen_id",
-      kitchens.map((k) => k.id)
-    )
-    .order("created_at", { ascending: true })
-    .returns<MenuItemRow[]>();
+  const kitchenIds = kitchens.map((k) => k.id);
+  const [{ data: items, error: itemsError }, { data: summaries }, liveSince] = await Promise.all([
+    supabase.from("menu_items").select("*").in("kitchen_id", kitchenIds).order("created_at", { ascending: true }).returns<MenuItemRow[]>(),
+    // Deliberately not fatal: before schema section 32 runs, the view doesn't
+    // exist -> error -> no summaries, and the marketplace still loads.
+    supabase.from("kitchen_rating_summary").select("kitchen_id, average, rating_count").in("kitchen_id", kitchenIds).returns<RatingSummaryRow[]>(),
+    loadLiveSince(supabase, kitchenIds),
+  ]);
 
   if (itemsError) throw new Error(`Failed to load menu items: ${itemsError.message}`);
 
-  // Deliberately not fatal: before schema section 32 runs, the view doesn't
-  // exist -> error -> no summaries, and the marketplace still loads.
-  const { data: summaries } = await supabase
-    .from("kitchen_rating_summary")
-    .select("kitchen_id, average, rating_count")
-    .in(
-      "kitchen_id",
-      kitchens.map((k) => k.id)
-    )
-    .returns<RatingSummaryRow[]>();
   const summaryByKitchen = new Map((summaries ?? []).map((s) => [s.kitchen_id, s]));
+  const now = Date.now();
 
   const merchants = kitchens.map((k) => {
     const kitchenItems = (items ?? []).filter((i) => i.kitchen_id === k.id);
     const prices = kitchenItems.map((i) => i.price);
     const image = k.hero_image ?? CATEGORY_FALLBACK_IMAGE[k.category];
     const summary = summaryByKitchen.get(k.id);
+    const since = liveSince.get(k.id) ?? null;
 
     return {
       id: k.id,
@@ -164,7 +185,10 @@ export async function getLiveMerchants(): Promise<Merchant[]> {
       avatarImage: image,
       cuisineType: k.cuisine_type,
       menuHighlights: kitchenItems.slice(0, 2).map((i) => ({ name: i.name, price: i.price })),
-      isNew: true,
+      isNew: isNewKitchen(since, now),
+      liveSince: since,
+      coverImage: k.hero_image ?? null,
+      menuPhoto: kitchenItems.find((i) => i.photo_url)?.photo_url ?? null,
       businessUen: k.business_uen ?? null,
       isBlocked: k.is_blocked === true,
     };

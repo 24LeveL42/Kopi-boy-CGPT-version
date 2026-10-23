@@ -54,7 +54,14 @@ export interface Merchant {
   avatarImage: string;
   cuisineType: CuisineType;
   menuHighlights: MenuHighlight[];
+  /** Inside its first NEW_KITCHEN_DAYS since liveSince (src/lib/new-kitchens.ts) — backs the green NEW pill. */
   isNew?: boolean;
+  /** When the kitchen went live: kitchens.live_since once that column exists, else created_at. Null when unreadable. */
+  liveSince?: string | null;
+  /** The cook's own cover photo (kitchens.hero_image) — null when heroImage is only the category picture. */
+  coverImage?: string | null;
+  /** The first menu item photo, if any — the hero slide's second choice after the cover photo. */
+  menuPhoto?: string | null;
   /** From the cook's HQ-approved application (never self-set) — backs the "Registered business" badge. */
   businessUen?: string | null;
   /** HQ has blocked this cook (kitchens.is_blocked) — shown as "Currently unavailable", no new orders. */

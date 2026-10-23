@@ -1,0 +1,109 @@
+import type { Merchant } from "@/lib/types";
+import type { KitchenDeal } from "@/lib/deals";
+
+/**
+ * Which slides the home hero carousel shows — display only. Slide A is
+ * always the brand hero. After it come flash deals, kitchen promotions and
+ * new kitchens, each built from live data and at most one slide per
+ * kitchen. With nothing to feature, a fallback slide follows the brand.
+ */
+export const MAX_HERO_SLIDES = 6;
+export const MAX_FLASH_SLIDES = 2;
+export const MAX_PROMO_SLIDES = 2;
+export const MAX_NEW_KITCHEN_SLIDES = 3;
+
+export type HeroSlide =
+  | { type: "brand"; key: "brand" }
+  | { type: "flash"; key: string; kitchen: Merchant; deal: KitchenDeal; image: string }
+  | { type: "promotion"; key: string; kitchen: Merchant; deal: KitchenDeal; image: string }
+  | { type: "new-kitchen"; key: string; kitchen: Merchant; image: string }
+  | { type: "fallback"; key: "fallback" };
+
+export const BRAND_ONLY: HeroSlide[] = [{ type: "brand", key: "brand" }];
+
+/** Cover photo, else the first menu photo, else the category picture. */
+export function slideImage(kitchen: Merchant): string {
+  return kitchen.coverImage || kitchen.menuPhoto || kitchen.heroImage;
+}
+
+/** Deterministic shuffle (mulberry32) so a seed always gives the same order. */
+export function seededShuffle<T>(items: readonly T[], seed: number): T[] {
+  let s = seed >>> 0;
+  const random = () => {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+const OFFSET_KEY = "kb-hero-rotation";
+
+/**
+ * A random number kept per visitor so two people in the same hour don't see
+ * the same order. Only this offset is stored — nothing about which slides
+ * were seen, and no view counts go anywhere.
+ */
+export function readVisitorOffset(): number {
+  try {
+    const saved = Number(localStorage.getItem(OFFSET_KEY));
+    if (Number.isInteger(saved) && saved > 0) return saved;
+    const fresh = 1 + Math.floor(Math.random() * 1_000_000);
+    localStorage.setItem(OFFSET_KEY, String(fresh));
+    return fresh;
+  } catch {
+    return 0;
+  }
+}
+
+/** Changes every hour, so every eligible kitchen gets its turn at the front. */
+export function rotationSeed(visitorOffset: number, now = Date.now()): number {
+  return Math.floor(now / 3_600_000) * 7919 + visitorOffset;
+}
+
+export function selectHeroSlides({
+  flashDeals,
+  promotions,
+  newKitchens,
+  merchantsById,
+  seed,
+}: {
+  flashDeals: KitchenDeal[];
+  promotions: KitchenDeal[];
+  newKitchens: Merchant[];
+  merchantsById: ReadonlyMap<string, Merchant>;
+  seed: number;
+}): HeroSlide[] {
+  const slides: HeroSlide[] = [...BRAND_ONLY];
+  const used = new Set<string>();
+  const add = (slide: Exclude<HeroSlide, { type: "brand" | "fallback" }>) => {
+    if (slides.length >= MAX_HERO_SLIDES || used.has(slide.kitchen.id) || slide.kitchen.isBlocked) return false;
+    used.add(slide.kitchen.id);
+    slides.push(slide);
+    return true;
+  };
+  const addDeals = (deals: KitchenDeal[], type: "flash" | "promotion", max: number) => {
+    let added = 0;
+    for (const deal of seededShuffle(deals, seed)) {
+      const kitchen = merchantsById.get(deal.kitchenId);
+      if (added >= max || !kitchen) continue;
+      if (add({ type, key: `${type}-${deal.id}`, kitchen, deal, image: slideImage(kitchen) })) added++;
+    }
+  };
+  addDeals(flashDeals, "flash", MAX_FLASH_SLIDES);
+  addDeals(promotions, "promotion", MAX_PROMO_SLIDES);
+  let added = 0;
+  for (const kitchen of seededShuffle(newKitchens, seed)) {
+    if (added >= MAX_NEW_KITCHEN_SLIDES) break;
+    if (add({ type: "new-kitchen", key: `new-${kitchen.id}`, kitchen, image: slideImage(kitchen) })) added++;
+  }
+  if (slides.length === 1) slides.push({ type: "fallback", key: "fallback" });
+  return slides;
+}
