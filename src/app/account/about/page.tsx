@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { BottomNav } from "@/components/BottomNav";
 import { LegalLinks } from "@/components/LegalLinks";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "About Kopi Boy",
+  title: `About ${BRAND_NAME}`,
 };
 
 export default function AboutPage() {
@@ -13,7 +14,7 @@ export default function AboutPage() {
         <div className="kb-page-title">
           <div>
             <p className="kb-eyebrow">ABOUT</p>
-            <h1>About Kopi Boy</h1>
+            <h1>About {BRAND_NAME}</h1>
             <p>From neighbourhoods to you.</p>
           </div>
         </div>
@@ -22,13 +23,13 @@ export default function AboutPage() {
           <div>
             <p className="text-sm font-bold text-slate-900">A connector for local kitchens</p>
             <p className="mt-1 text-xs leading-5 text-slate-500">
-              Kopi Boy connects home cooks, hawkers and small food businesses with customers nearby. The kitchens cook and sell their own food. Kopi Boy helps you find them and place your order.
+              {BRAND_NAME} connects home cooks, hawkers and small food businesses with customers nearby. The kitchens cook and sell their own food. {BRAND_NAME} helps you find them and place your order.
             </p>
           </div>
           <div>
             <p className="text-sm font-bold text-slate-900">0% commission</p>
             <p className="mt-1 text-xs leading-5 text-slate-500">
-              Kopi Boy takes no commission on your food. You pay the kitchen directly by PayNow, and Kopi Boy never holds your money.
+              {BRAND_NAME} takes no commission on your food. You pay the kitchen directly by PayNow, and {BRAND_NAME} never holds your money.
             </p>
           </div>
           <div>

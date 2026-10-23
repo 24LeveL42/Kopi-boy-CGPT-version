@@ -5,21 +5,22 @@ import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { NotificationBell } from "./NotificationBell";
 import { CartButton } from "./CartButton";
+import { BRAND_NAME } from "@/lib/brand";
 
 export function PageChrome() {
   const pathname = usePathname();
   const router = useRouter();
   if (pathname === "/" || pathname.startsWith("/merchant/")) return null;
 
-  const title = pathname.startsWith("/merchant/") ? "Kitchen" : pathname.startsWith("/orders/") ? "Order details" : pathname === "/orders" ? "My orders" : pathname === "/cart" ? "Your cart" : pathname === "/account" ? "My profile" : pathname === "/account/addresses" ? "My addresses" : pathname === "/account/notifications" ? "Notifications" : pathname === "/account/payment" ? "Payment method" : pathname === "/account/help" ? "Help & support" : pathname === "/account/about" ? "About Kopi Boy" : pathname === "/notifications" ? "Notifications" : pathname === "/login" ? "Sign in" : "Kopi Boy";
+  const title = pathname.startsWith("/merchant/") ? "Kitchen" : pathname.startsWith("/orders/") ? "Order details" : pathname === "/orders" ? "My orders" : pathname === "/cart" ? "Your cart" : pathname === "/account" ? "My profile" : pathname === "/account/addresses" ? "My addresses" : pathname === "/account/notifications" ? "Notifications" : pathname === "/account/payment" ? "Payment method" : pathname === "/account/help" ? "Help & support" : pathname === "/account/about" ? `About ${BRAND_NAME}` : pathname === "/notifications" ? "Notifications" : pathname === "/login" ? "Sign in" : BRAND_NAME;
 
   return (
     <header className="kb-page-chrome">
       <button type="button" onClick={() => router.back()} aria-label="Go back" className="kb-icon-button">
         <BackIcon />
       </button>
-      <Link href="/" aria-label="Kopi Boy home" className="kb-chrome-brand">
-        <Image src="/brand/logo-icon.png" alt="Kopi Boy" width={34} height={34} className="h-8 w-8 object-contain" />
+      <Link href="/" aria-label={`${BRAND_NAME} home`} className="kb-chrome-brand">
+        <Image src="/brand/logo-icon.png" alt={BRAND_NAME} width={34} height={34} className="h-8 w-8 object-contain" />
         <span>{title}</span>
       </Link>
       <div className="ml-auto flex items-center gap-1">

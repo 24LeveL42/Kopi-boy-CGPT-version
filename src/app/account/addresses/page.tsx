@@ -4,9 +4,10 @@ import { createClient } from "@/lib/supabase/server";
 import { loadSavedAddresses } from "@/lib/address-store";
 import { AddressBook } from "@/components/AddressBook";
 import { BottomNav } from "@/components/BottomNav";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "My addresses — Kopi Boy",
+  title: `My addresses — ${BRAND_NAME}`,
 };
 
 export default async function AddressesPage() {

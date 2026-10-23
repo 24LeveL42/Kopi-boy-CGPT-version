@@ -7,9 +7,10 @@ import { SupportMessageForm } from "@/components/SupportMessageForm";
 import { ASAP_ETA_MINUTES, MIN_LEAD_MINUTES, MAX_AHEAD_DAYS } from "@/lib/delivery-time";
 import { MAX_ADDRESSES } from "@/lib/addresses";
 import { getPaymentWindowMinutes, paymentWindowText } from "@/lib/payment-proof";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "Help & support — Kopi Boy",
+  title: `Help & support — ${BRAND_NAME}`,
 };
 
 /** paymentWindow: "within 5 minutes", from the database setting (public.payment_window_minutes()). */
@@ -20,7 +21,7 @@ const faq = (paymentWindow: string): { q: string; a: string }[] => [
   },
   {
     q: "How do I pay by PayNow?",
-    a: `Once the cook accepts, your order page shows the kitchen's PayNow number or UEN and the total. Pay the kitchen from your banking app and upload a screenshot of the transfer on the order page ${paymentWindow}. If no proof arrives in time, the order is cancelled automatically. Kopi Boy never holds your money.`,
+    a: `Once the cook accepts, your order page shows the kitchen's PayNow number or UEN and the total. Pay the kitchen from your banking app and upload a screenshot of the transfer on the order page ${paymentWindow}. If no proof arrives in time, the order is cancelled automatically. ${BRAND_NAME} never holds your money.`,
   },
   {
     q: "Why is the delivery fee an estimate?",
@@ -36,7 +37,7 @@ const faq = (paymentWindow: string): { q: string; a: string }[] => [
   },
   {
     q: "How do I get notifications?",
-    a: "Go to Profile, then Notifications, and switch on order notifications. On iPhone, first add Kopi Boy to your Home Screen (Share, then Add to Home Screen) and open it from there.",
+    a: `Go to Profile, then Notifications, and switch on order notifications. On iPhone, first add ${BRAND_NAME} to your Home Screen (Share, then Add to Home Screen) and open it from there.`,
   },
   {
     q: "How do saved addresses work?",
@@ -80,7 +81,7 @@ export default async function HelpPage() {
           <SupportMessageForm userId={user.id} />
         ) : (
           <div className="kb-signin-card mt-4">
-            <p className="font-extrabold">Message Kopi Boy</p>
+            <p className="font-extrabold">Message {BRAND_NAME}</p>
             <p className="mt-1 text-sm text-slate-500">Sign in to send us a message and see our replies.</p>
             <Link href="/login" className="kb-primary-button mt-4 w-full">
               Sign in

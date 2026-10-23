@@ -5,11 +5,12 @@ import { PageChrome } from "@/components/PageChrome";
 import { NotificationToasts } from "@/components/NotificationToasts";
 import { PushSync } from "@/components/PushNotifications";
 import "./globals.css";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "Kopi Boy — From neighbourhoods to you",
+  title: `${BRAND_NAME} — From neighbourhoods to you`,
   description:
-    "Kopi Boy connects home cooks, hawkers, and small food businesses with customers nearby — zero food-order commission.",
+    `${BRAND_NAME} connects home cooks, hawkers, and small food businesses with customers nearby — zero food-order commission.`,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

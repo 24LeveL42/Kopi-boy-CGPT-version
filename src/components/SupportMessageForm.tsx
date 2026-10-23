@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Spinner } from "@/components/Spinner";
+import { BRAND_NAME } from "@/lib/brand";
 import {
   SUPPORT_MESSAGE_COLUMNS,
   SUPPORT_MESSAGE_MAX_LENGTH,
@@ -83,7 +84,7 @@ export function SupportMessageForm({ userId }: { userId: string }) {
     <section className="kb-cart-card mt-4" data-testid="support-message-form">
       <form onSubmit={send}>
         <label htmlFor="support-message" className="text-xs font-black uppercase tracking-[.14em] text-purple-600">
-          Message Kopi Boy
+          Message {BRAND_NAME}
         </label>
         <p className="mt-1 text-xs text-slate-500">For a problem with one order, use &quot;Report an issue&quot; on that order&apos;s page instead.</p>
         <textarea
@@ -139,7 +140,7 @@ export function SupportMessageForm({ userId }: { userId: string }) {
                 {m.admin_reply ? (
                   <div className="mt-2 rounded-xl bg-purple-50 px-3 py-2">
                     <p className="text-xs font-bold text-purple-700">
-                      Kopi Boy{m.replied_at ? ` · ${formatTimestamp(m.replied_at)}` : ""}
+                      {BRAND_NAME}{m.replied_at ? ` · ${formatTimestamp(m.replied_at)}` : ""}
                     </p>
                     <p className="mt-0.5 whitespace-pre-wrap break-words text-sm text-slate-800">{m.admin_reply}</p>
                   </div>

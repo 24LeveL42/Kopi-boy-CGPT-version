@@ -7,6 +7,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { BRAND_SUPPORT_NAME } from "@/lib/brand";
 
 export interface ComplaintMessageRow {
   id: string;
@@ -65,7 +66,7 @@ export type ComplaintClearClient = Pick<SupabaseClient, "from" | "storage">;
 /** `resolved: true` = HQ has marked the thread resolved (schema §29), so it can no longer be cleared. */
 export type ClearComplaintResult = { ok: true } | { ok: false; message: string; resolved?: true };
 
-export const COMPLAINT_RESOLVED_MESSAGE = "Kopi Boy Support has marked this chat resolved — it's kept as a record and can't be cleared.";
+export const COMPLAINT_RESOLVED_MESSAGE = `${BRAND_SUPPORT_NAME} has marked this chat resolved — it's kept as a record and can't be cleared.`;
 
 /** Whether HQ has marked the order's thread resolved; null if that couldn't be checked. */
 export async function isComplaintResolved(supabase: Pick<SupabaseClient, "from">, orderId: string): Promise<boolean | null> {

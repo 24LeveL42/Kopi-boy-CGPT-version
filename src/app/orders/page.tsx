@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { BottomNav } from "@/components/BottomNav";
+import { BRAND_NAME } from "@/lib/brand";
 import {
   formatTimestamp,
   getStage,
@@ -12,7 +13,7 @@ import {
 } from "./[id]/page";
 
 export const metadata: Metadata = {
-  title: "My orders — Kopi Boy",
+  title: `My orders — ${BRAND_NAME}`,
 };
 
 /** How many orders the history shows — the same 10 the archive trigger keeps (schema §27). */
@@ -64,7 +65,7 @@ export default async function OrdersPage() {
   return (
     <div className="kb-app-shell min-h-screen pb-28">
       <div className="mx-auto max-w-md px-4 py-6 sm:px-6">
-        <div className="kb-page-title"><div><p className="kb-eyebrow">YOUR ACTIVITY</p><h1>My Orders</h1><p>Track every Kopi Boy order in one place.</p></div></div>
+        <div className="kb-page-title"><div><p className="kb-eyebrow">YOUR ACTIVITY</p><h1>My Orders</h1><p>Track every {BRAND_NAME} order in one place.</p></div></div>
 
         {!user ? (
           <div className="kb-signin-card mt-5">

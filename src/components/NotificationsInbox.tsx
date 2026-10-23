@@ -6,6 +6,7 @@ import { LoadingStatus, Skeleton } from "@/components/Skeleton";
 import { Spinner } from "@/components/Spinner";
 import { useNotifications } from "@/lib/notifications-context";
 import { formatRelativeTime, notificationHref, type NotificationRow } from "@/lib/notifications";
+import { BRAND_NAME } from "@/lib/brand";
 
 /**
  * The /notifications inbox. Reads the same live list as the bell and toasts
@@ -20,7 +21,7 @@ export function NotificationsInbox() {
   return (
     <div className="kb-app-shell min-h-screen pb-28">
       <div className="mx-auto max-w-md px-4 py-6 sm:px-6">
-        <div className="kb-page-title"><div><p className="kb-eyebrow">STAY IN THE LOOP</p><h1>Notifications</h1><p>Order updates and important Kopi Boy messages.</p></div>
+        <div className="kb-page-title"><div><p className="kb-eyebrow">STAY IN THE LOOP</p><h1>Notifications</h1><p>Order updates and important {BRAND_NAME} messages.</p></div>
           {unreadCount > 0 && (
             <button
               type="button"

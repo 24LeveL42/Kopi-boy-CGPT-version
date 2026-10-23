@@ -1,9 +1,10 @@
 import type { MetadataRoute } from "next";
+import { BRAND_NAME } from "@/lib/brand";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Kopi Boy",
-    short_name: "Kopi Boy",
+    name: BRAND_NAME,
+    short_name: BRAND_NAME,
     description: "From neighbourhoods to you — order from home cooks, hawkers and small food businesses nearby.",
     start_url: "/",
     display: "standalone",

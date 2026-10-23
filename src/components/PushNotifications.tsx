@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useIsClient } from "@/lib/use-is-client";
 import { Spinner } from "@/components/Spinner";
+import { BRAND_NAME } from "@/lib/brand";
 import {
   detectPushState,
   disablePush,
@@ -111,24 +112,24 @@ export const PUSH_STATUS_TEXT: Record<PushState, string> = {
   on: "On. You'll get a notification when your order changes.",
   off: "Off. Switch on to hear about your order even with the app closed.",
   blocked: "Blocked in your browser settings.",
-  "needs-install": "Add Kopi Boy to your Home Screen first.",
-  insecure: "Only available on the secure (https://) Kopi Boy site.",
+  "needs-install": `Add ${BRAND_NAME} to your Home Screen first.`,
+  insecure: `Only available on the secure (https://) ${BRAND_NAME} site.`,
   unsupported: "This browser can't show notifications.",
-  unconfigured: "Notifications aren't set up for Kopi Boy yet. Please check back soon.",
+  unconfigured: `Notifications aren't set up for ${BRAND_NAME} yet. Please check back soon.`,
 };
 
 /** Step-by-step help for the states the customer can fix themselves. */
 const STATE_HELP: Partial<Record<PushState, string[]>> = {
   blocked: [
     "Android (Chrome): tap the icon to the left of the web address, then Permissions or Site settings, then Notifications, and choose Allow.",
-    "If you added Kopi Boy to your Home Screen: press and hold its icon, tap App info, then Notifications, and switch them on.",
-    "iPhone (Home Screen app): open Settings, then Notifications, then Kopi Boy, and turn on Allow Notifications.",
+    `If you added ${BRAND_NAME} to your Home Screen: press and hold its icon, tap App info, then Notifications, and switch them on.`,
+    `iPhone (Home Screen app): open Settings, then Notifications, then ${BRAND_NAME}, and turn on Allow Notifications.`,
     "Then come back to this page.",
   ],
-  "needs-install": [IOS_INSTALL_HINT, "Then open Kopi Boy from the Home Screen and switch notifications on here."],
+  "needs-install": [IOS_INSTALL_HINT, `Then open ${BRAND_NAME} from the Home Screen and switch notifications on here.`],
   unsupported: [
-    "On iPhone or iPad: open Kopi Boy in Safari, tap Share, then Add to Home Screen, and open it from there.",
-    "On Android: open Kopi Boy in Chrome itself, not inside another app such as WhatsApp or Instagram.",
+    `On iPhone or iPad: open ${BRAND_NAME} in Safari, tap Share, then Add to Home Screen, and open it from there.`,
+    `On Android: open ${BRAND_NAME} in Chrome itself, not inside another app such as WhatsApp or Instagram.`,
   ],
 };
 

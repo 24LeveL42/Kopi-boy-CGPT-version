@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { BottomNav } from "@/components/BottomNav";
 import { PushToggle } from "@/components/PushNotifications";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "Notification settings — Kopi Boy",
+  title: `Notification settings — ${BRAND_NAME}`,
 };
 
 /** Push on/off for this device. The in-app inbox stays at /notifications (the bell). */

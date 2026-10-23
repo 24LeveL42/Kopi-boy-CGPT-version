@@ -6,6 +6,7 @@ import { CameraIcon } from "@/components/CameraIcon";
 import { ChatBubble } from "@/components/ChatBubble";
 import { Spinner } from "@/components/Spinner";
 import { mergeMessages, MESSAGE_BODY_MAX_LENGTH, MESSAGE_FETCH_LIMIT } from "@/lib/messages";
+import { BRAND_NAME, BRAND_SUPPORT_NAME } from "@/lib/brand";
 import {
   COMPLAINT_PHOTO_BUCKET,
   COMPLAINT_PHOTO_TYPES,
@@ -195,7 +196,7 @@ export function SupportChat({ orderId, currentUserId }: { orderId: string; curre
     // Confirmed like the cart's "Clear all" — but this one can't be undone and HQ loses the thread too.
     if (
       !window.confirm(
-        "Delete this whole support chat, including any photos? This can't be undone, and Kopi Boy Support will lose the conversation too."
+        `Delete this whole support chat, including any photos? This can't be undone, and ${BRAND_SUPPORT_NAME} will lose the conversation too.`
       )
     )
       return;
@@ -219,7 +220,7 @@ export function SupportChat({ orderId, currentUserId }: { orderId: string; curre
     <div data-testid="support-chat" className="mt-3 rounded-xl text-left" style={{ background: "var(--kb-cream)" }}>
       <div className="flex items-start justify-between gap-2 px-3 pt-3">
         <p className="text-xs font-semibold" style={{ color: "var(--kb-ink-soft)" }}>
-          Kopi Boy support — tell us what went wrong. You can attach a photo.
+          {BRAND_NAME} support — tell us what went wrong. You can attach a photo.
         </p>
         {status === "ready" && resolved === false && messages.length > 0 && (
           <button
@@ -236,7 +237,7 @@ export function SupportChat({ orderId, currentUserId }: { orderId: string; curre
       </div>
       {resolved && !clearError && (
         <p data-testid="support-resolved" className="px-3 pt-1 text-xs" style={{ color: "var(--kb-ink-soft)" }}>
-          Resolved by Kopi Boy Support — this chat is kept as a record.
+          Resolved by {BRAND_SUPPORT_NAME} — this chat is kept as a record.
         </p>
       )}
       {clearError && (
@@ -265,7 +266,7 @@ export function SupportChat({ orderId, currentUserId }: { orderId: string; curre
           const mine = m.sender_id === currentUserId;
           const url = m.photo_path ? photoUrls[m.photo_path] : undefined;
           return (
-            <ChatBubble key={m.id} mine={mine} senderLabel="Kopi Boy Support" testId="support-message">
+            <ChatBubble key={m.id} mine={mine} senderLabel={BRAND_SUPPORT_NAME} testId="support-message">
               {m.photo_path &&
                 (url ? (
                   <a href={url} target="_blank" rel="noopener noreferrer">
