@@ -9,6 +9,7 @@ import type { SavedAddress } from "@/lib/addresses";
 const push = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }), usePathname: () => "/cart" }));
 vi.mock("@/lib/order-actions", () => ({ placeOrder: vi.fn() }));
+vi.mock("@/lib/pricing-actions", () => ({ quoteOrderPricing: vi.fn(async () => null) }));
 vi.mock("@/lib/delivery-actions", () => ({ quoteDelivery: vi.fn() }));
 vi.mock("@/lib/kitchen-actions", () => ({ isKitchenBlocked: vi.fn(async () => false) }));
 
@@ -78,7 +79,12 @@ describe("Checkout — Deliver to", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Confirm Order/ }));
     await waitFor(() => expect(push).toHaveBeenCalledWith("/orders/order-9"));
-    expect(placeOrder).toHaveBeenCalledWith("k1", [{ menuItemId: "m1", quantity: 1 }], { deliveryType: "express", scheduledFor: null, addressId: "home" });
+    expect(placeOrder).toHaveBeenCalledWith(
+      "k1",
+      [{ menuItemId: "m1", quantity: 1 }],
+      { deliveryType: "express", scheduledFor: null, addressId: "home" },
+      { requestId: expect.any(String), expected: { foodTotal: 2, deliveryFee: expect.any(Number) } }
+    );
   });
 
   it("delivers to a different address: postal check, unit, notes, save off by default", async () => {

@@ -36,6 +36,7 @@ vi.mock("next/navigation", () => ({
   },
 }));
 vi.mock("@/lib/order-actions", () => ({ placeOrder: vi.fn() }));
+vi.mock("@/lib/pricing-actions", () => ({ quoteOrderPricing: vi.fn(async () => null) }));
 vi.mock("@/lib/kitchen-actions", () => ({ isKitchenBlocked: vi.fn() }));
 vi.mock("@/lib/delivery-actions", () => ({ quoteDelivery: vi.fn() }));
 

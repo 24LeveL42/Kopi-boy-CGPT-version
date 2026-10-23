@@ -4,10 +4,11 @@ import { createClient } from "@/lib/supabase/server";
 import { DEAL_KINDS, NO_DEALS, isDealLive, type DealKind, type DealsFeed, type KitchenDeal } from "@/lib/deals";
 
 /**
- * The read-only view Phase C will add (approved, live kitchens' currently
- * running deals) and the columns the Customer app reads from it. Until it
- * exists the query errors and every deal surface stays hidden — the same way
- * ratings degrade before kitchen_rating_summary exists.
+ * The read-only view docs/supabase-promotions.sql PART 1 adds (approved,
+ * live kitchens' currently running deals, empty while
+ * app_settings.deals_enabled is off) and the columns the Customer app reads
+ * from it. Until it exists the query errors and every deal surface stays
+ * hidden — the same way ratings degrade before kitchen_rating_summary exists.
  */
 export const DEALS_VIEW = "kitchen_active_deals";
 const DEAL_COLUMNS =

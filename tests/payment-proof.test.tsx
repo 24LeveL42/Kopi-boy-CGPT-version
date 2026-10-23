@@ -202,6 +202,12 @@ describe("payment deadline helpers", () => {
 });
 
 describe("/orders/[id] — payment proof card", () => {
+  it("asks for the amount after the kitchen's deal, plus the delivery fee", async () => {
+    const { container } = await renderPage(order({ discount_total: 2.5, food_total: 10 }));
+    const card = within(container).getByTestId("payment-proof-card");
+    expect(within(card).getByTestId("payment-amount")).toHaveTextContent("$12.80");
+  });
+
   it("State A: accepted + unpaid shows the three steps, PayNow, amount incl. delivery fee, and the order ref", async () => {
     const { container } = await renderPage(order());
     const card = within(container).getByTestId("payment-proof-card");

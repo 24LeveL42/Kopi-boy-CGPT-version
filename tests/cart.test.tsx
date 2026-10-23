@@ -7,6 +7,7 @@ import { complaintPhotoPath, normalizeComplaintBody, validateComplaintPhoto } fr
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }), usePathname: () => "/cart" }));
 vi.mock("@/lib/order-actions", () => ({ placeOrder: vi.fn() }));
+vi.mock("@/lib/pricing-actions", () => ({ quoteOrderPricing: vi.fn(async () => null) }));
 vi.mock("@/lib/kitchen-actions", () => ({ isKitchenBlocked: vi.fn(async () => false) }));
 vi.mock("@/lib/use-customer-location", () => ({
   useCustomerLocation: () => ({ coords: null, status: "idle", requestLocation: vi.fn() }),

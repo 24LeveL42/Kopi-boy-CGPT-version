@@ -299,6 +299,25 @@ describe("/orders/[id] — rating + totals", () => {
     expect(within(container).getByTestId("order-total")).toHaveTextContent("Total$15.30");
   });
 
+  it("with a kitchen deal: Subtotal stays gross, a Deal line, and Total is food total + fee", async () => {
+    const { container } = await renderPage(
+      order({ subtotal: 12.5, discount_total: 2.5, food_total: 10, delivery_fee_estimate: 2.8 }),
+      [accepted]
+    );
+    expect(container).toHaveTextContent("Subtotal$12.50");
+    expect(within(container).getByTestId("order-deal")).toHaveTextContent("Deal-$2.50");
+    expect(within(container).getByTestId("order-total")).toHaveTextContent("Total$12.80");
+  });
+
+  it("shows no Deal line when the discount is 0, or the column isn't there yet", async () => {
+    const zero = await renderPage(order({ subtotal: 12.5, discount_total: 0, food_total: 12.5, delivery_fee_estimate: 2.8 }), [accepted]);
+    expect(within(zero.container).queryByTestId("order-deal")).toBeNull();
+    expect(within(zero.container).getByTestId("order-total")).toHaveTextContent("Total$15.30");
+    cleanup();
+    const old = await renderPage(order({ subtotal: 12.5, delivery_fee_estimate: 2.8 }), [accepted]);
+    expect(within(old.container).queryByTestId("order-deal")).toBeNull();
+  });
+
   it("shows the delivery type, the customer's postal code and the distance", async () => {
     const { container } = await renderPage(
       order({

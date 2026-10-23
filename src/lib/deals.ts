@@ -3,10 +3,12 @@ import type { Merchant } from "@/lib/types";
 /**
  * Kitchen deals — client-safe types and wording, display only. Every deal is
  * created and funded by its own kitchen; nothing here prices an order
- * (placeOrder() and checkout never read this). The data source doesn't
- * exist yet (Phase C adds it), so DealsFeed.available stays false and every
- * deal surface — card badges, Today's Deals, promotion and flash hero
- * slides — renders nothing until then.
+ * (placeOrder() and checkout never read this — the database prices orders,
+ * see src/lib/order-pricing.ts). The data source is the kitchen_active_deals
+ * view (docs/supabase-promotions.sql PART 1), which shows nothing while
+ * app_settings.deals_enabled is off; until the view exists
+ * DealsFeed.available stays false and every deal surface — card badges,
+ * Today's Deals, promotion and flash hero slides — renders nothing.
  */
 export type DealKind = "percent_off" | "amount_off" | "buy_x_get_y" | "free_item" | "min_spend" | "limited_qty" | "flash";
 

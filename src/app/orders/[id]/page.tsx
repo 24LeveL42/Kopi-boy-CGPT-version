@@ -21,11 +21,17 @@ import {
 } from "@/lib/payment-proof";
 import { DELIVERY_TYPE_LABEL, isDeliveryType } from "@/lib/delivery-types";
 import { asapArrivalEstimate } from "@/lib/delivery-time";
+import { formatDealAmount, orderDiscount, orderFoodTotal } from "@/lib/order-pricing";
 
 export interface OrderRow {
   id: string;
   kitchen_id: string;
   subtotal: number;
+  /** Kitchen deal (docs/supabase-promotions.sql PART 2); absent before it runs, 0 when there was no deal. */
+  discount_total?: number | null;
+  /** subtotal - discount_total: what the customer pays for the food. */
+  food_total?: number | null;
+  promotion_label?: string | null;
   /** Absent on projects where schema section 18 hasn't run; null on older orders placed without a location. */
   delivery_fee_estimate?: number | null;
   /** Postal-code delivery quote (src/lib/delivery-quote.ts); null on orders placed before it. */
@@ -327,7 +333,8 @@ export default async function OrderConfirmationPage({
   }
 
   const deliveryFee = order.delivery_fee_estimate ?? null;
-  const total = order.subtotal + (deliveryFee ?? 0);
+  const discount = orderDiscount(order);
+  const total = orderFoodTotal(order) + (deliveryFee ?? 0);
   const deliveryTypeLabel = isDeliveryType(order.delivery_type) ? DELIVERY_TYPE_LABEL[order.delivery_type] : null;
   const deliveryDistanceKm = order.delivery_distance_km != null ? Number(order.delivery_distance_km) : null;
   const scheduledFor = formatTimestamp(order.scheduled_for ?? null);
@@ -456,6 +463,12 @@ export default async function OrderConfirmationPage({
               <span className="font-semibold">Subtotal</span>
               <span className="font-semibold">${order.subtotal.toFixed(2)}</span>
             </div>
+            {discount > 0 && (
+              <div data-testid="order-deal" className="flex items-center justify-between text-sm" style={{ color: "var(--kb-ink-soft)" }}>
+                <span>Deal</span>
+                <span>{formatDealAmount(discount)}</span>
+              </div>
+            )}
             {deliveryTypeLabel && (
               <div data-testid="order-delivery-type" className="flex items-center justify-between text-sm" style={{ color: "var(--kb-ink-soft)" }}>
                 <span>Delivery</span>

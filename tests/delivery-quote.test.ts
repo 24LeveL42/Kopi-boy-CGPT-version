@@ -3,8 +3,14 @@ import { quoteDelivery } from "@/lib/delivery-actions";
 import { placeOrder } from "@/lib/order-actions";
 import { createClient } from "@/lib/supabase/server";
 import { geocodePostalCode } from "@/lib/geocode";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { createFakeAdmin } from "./helpers/fake-admin";
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
+// No service-role key by default: placeOrder() uses the old insert path, whose
+// fee handling these tests pin down. The place_order path is tested below and
+// in place-order-rpc.test.ts.
+vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn(() => null) }));
 vi.mock("@/lib/geocode", () => ({ geocodePostalCode: vi.fn() }));
 
 const FOUND = { ok: true as const, lat: 1.337, lng: 103.845, address: "123 LORONG 1 TOA PAYOH SINGAPORE 310123" };
@@ -132,6 +138,21 @@ describe("placeOrder — server-side delivery fee", () => {
   function orderInsert(supabase: ReturnType<typeof makeSupabase>) {
     return supabase.inserts.find((i) => i.table === "orders")?.values as Record<string, unknown> | undefined;
   }
+
+  it("place_order path: sends the geocoded coordinates and type, never a fee (the database quotes it)", async () => {
+    const supabase = useSupabase({ menu: MENU });
+    const admin = createFakeAdmin();
+    vi.mocked(createAdminClient).mockReturnValueOnce(admin.client as never);
+    const tampered = { postalCode: "310123", deliveryType: "express", fee: 0.01, delivery_fee_estimate: 0.01, latitude: 1.4, longitude: 103.9 };
+    await expect(placeOrder("kitchen-1", [{ menuItemId: "m1", quantity: 2 }], tampered as never)).resolves.toEqual({ ok: true, orderId: "order-1" });
+
+    const delivery = admin.calls[0].args.p_delivery as Record<string, unknown>;
+    expect(delivery).toMatchObject({ delivery_type: "express", lat: FOUND.lat, lng: FOUND.lng, postal_code: "310123" });
+    expect(delivery).not.toHaveProperty("fee");
+    expect(delivery).not.toHaveProperty("delivery_fee_estimate");
+    expect(JSON.stringify(admin.calls[0].args)).not.toContain("0.01");
+    expect(supabase.inserts).toEqual([]);
+  });
 
   it("stores postal code, geocoded coordinates, type, distance and the RPC's fee", async () => {
     const supabase = useSupabase({ menu: MENU });

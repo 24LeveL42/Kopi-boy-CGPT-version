@@ -110,6 +110,13 @@ describe("/orders — order history", () => {
     expect(items[1]).toHaveTextContent("Rider is on the way to pick up your food");
   });
 
+  it("shows the food total after a kitchen deal", async () => {
+    db.rows = [row({ discount_total: 2.5, food_total: 10 })];
+    await renderPage();
+    expect(screen.getByTestId("order-history-row")).toHaveTextContent("$10.00");
+    expect(screen.getByTestId("order-history-row")).not.toHaveTextContent("$12.50");
+  });
+
   it("shows the scheduled delivery time, and nothing extra for as-soon-as-possible orders", async () => {
     db.rows = [row({ id: "o2", scheduled_for: "2026-09-21T10:30:00.000Z" }), row({ id: "o1" })];
     await renderPage();

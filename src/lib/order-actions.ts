@@ -1,16 +1,32 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { quoteDeliveryForPostalCode } from "@/lib/delivery-quote";
 import { deliveryQuoteMessage, isDeliveryType, type DeliveryType } from "@/lib/delivery-types";
 import { getKitchenOrderStatus } from "@/lib/kitchens";
 import { UNAVAILABLE_ORDER_MESSAGE } from "@/lib/kitchen-availability";
 import { canAddAddress, isAddressId, validateAddressDetails, validateAddressInput } from "@/lib/addresses";
 import { validateScheduledFor } from "@/lib/delivery-time";
+import { isUuid } from "@/lib/order-push";
+import { parsePricingChange, type ExpectedPricing, type PricingChange } from "@/lib/order-pricing";
 
 export type PlaceOrderResult =
   | { ok: true; orderId: string; addressSaved?: boolean }
-  | { ok: false; message: string };
+  | { ok: false; message: string; pricingChanged?: PricingChange };
+
+/**
+ * `requestId`: a fresh UUID per checkout attempt, sent again on a retry of
+ * the same attempt, so a double tap or a lost response never makes a second
+ * order (place_order returns the existing one). `expected`: the food total
+ * and delivery fee the customer was shown; if the database would charge
+ * anything else, nothing is placed and `pricingChanged` carries the new
+ * numbers for the customer to confirm.
+ */
+export interface PlaceOrderOptions {
+  requestId?: string | null;
+  expected?: ExpectedPricing | null;
+}
 
 /**
  * Where the order goes: one of the customer's saved addresses (`addressId`),
@@ -33,10 +49,77 @@ export interface OrderDelivery {
 const SAVED_ADDRESS_MISSING = "That saved address couldn't be found. Please choose another one.";
 const SCHEDULING_UNAVAILABLE = "Scheduled delivery isn't available yet. Please choose As soon as possible.";
 
+const MAX_ITEM_QUANTITY = 99;
+
 // PGRST204 / 42703: the orders.delivery_address_* columns don't exist yet
 // (docs/supabase-customer-addresses.sql not run).
 function isMissingColumn(error: { code?: string } | null): boolean {
   return error?.code === "PGRST204" || error?.code === "42703";
+}
+
+// What place_order raises, worded for the customer. Matched by name in the
+// error message, like the quote_delivery errors in src/lib/delivery-quote.ts.
+const PLACE_ORDER_ERRORS: [string, string][] = [
+  ["kitchen_blocked", UNAVAILABLE_ORDER_MESSAGE],
+  ["kitchen_unavailable", "This kitchen isn't accepting orders right now."],
+  ["item_unavailable", "One of the items in your cart is no longer available."],
+  ["invalid_item", "One of the items in your cart is no longer available."],
+  ["invalid_quantity", "Invalid item quantity in cart."],
+  ["empty_cart", "Your cart is empty."],
+  ["kitchen_location_missing", deliveryQuoteMessage("kitchen_location_missing")],
+  ["invalid_location", deliveryQuoteMessage("invalid_location")],
+  ["invalid_schedule", "That delivery time has passed. Please choose another one."],
+];
+
+const PRICING_CHANGED_MESSAGE = "The price of your order has changed. Please check the new total.";
+
+function expectedPricing(expected: ExpectedPricing | null | undefined): { food_total: number; delivery_fee: number } | null {
+  if (!expected) return null;
+  const foodTotal = Number(expected.foodTotal);
+  const deliveryFee = Number(expected.deliveryFee);
+  if (!Number.isFinite(foodTotal) || !Number.isFinite(deliveryFee)) return null;
+  return { food_total: foodTotal, delivery_fee: deliveryFee };
+}
+
+/**
+ * The order through public.place_order (docs/supabase-promotions.sql), which
+ * prices it from menu_items with the kitchen's deal, takes the fee from
+ * quote_delivery and creates order + items in one transaction. Runs with the
+ * service role because only it may call the function; the customer id is
+ * the signed-in user's, read on the server. Null means "not available":
+ * no service-role key configured, or the function doesn't exist yet
+ * (PGRST202) — the caller then places the order the old way.
+ */
+async function placeOrderThroughRpc(args: {
+  customerId: string;
+  kitchenId: string;
+  items: { menuItemId: string; quantity: number }[];
+  delivery: Record<string, unknown>;
+  options: PlaceOrderOptions | undefined;
+}): Promise<PlaceOrderResult | null> {
+  const admin = createAdminClient();
+  if (!admin) return null;
+
+  const { data, error } = await admin.rpc("place_order", {
+    p_customer_id: args.customerId,
+    p_kitchen_id: args.kitchenId,
+    p_items: args.items.map((i) => ({ menu_item_id: i.menuItemId, quantity: i.quantity })),
+    p_delivery: args.delivery,
+    p_expected: expectedPricing(args.options?.expected),
+    p_request_id: isUuid(args.options?.requestId) ? args.options.requestId : null,
+  });
+  if (error?.code === "PGRST202") return null;
+  if (error) {
+    if (error.message.includes("pricing_changed")) {
+      const change = parsePricingChange(error.details);
+      return change ? { ok: false, message: PRICING_CHANGED_MESSAGE, pricingChanged: change } : { ok: false, message: PRICING_CHANGED_MESSAGE };
+    }
+    const known = PLACE_ORDER_ERRORS.find(([name]) => error.message.includes(name));
+    return { ok: false, message: known ? known[1] : `Couldn't place order: ${error.message}` };
+  }
+  const orderId = (data as { order_id?: unknown } | null)?.order_id;
+  if (typeof orderId !== "string" || !orderId) return { ok: false, message: "Couldn't place order: unknown error" };
+  return { ok: true, orderId };
 }
 
 /**
@@ -57,6 +140,13 @@ function isMissingColumn(error: { code?: string } | null): boolean {
  * The address text (line, unit, notes) is snapshotted onto the order, so a
  * later edit or delete of the saved address never changes this order.
  *
+ * Once docs/supabase-promotions.sql PART 2 has run, the order itself is
+ * created by the place_order database function (see placeOrderThroughRpc):
+ * it prices every item from menu_items, applies the kitchen's best running
+ * deal and calls quote_delivery again with the coordinates geocoded here.
+ * Until then (or without the service-role key) the order is inserted the old
+ * way below, unchanged.
+ *
  * Returns a result object rather than throwing, for the same reason as
  * cancelOrder() below (thrown messages are redacted in production), and
  * returns the new order id rather than calling redirect() itself — the
@@ -65,11 +155,12 @@ function isMissingColumn(error: { code?: string } | null): boolean {
 export async function placeOrder(
   kitchenId: string,
   items: { menuItemId: string; quantity: number }[],
-  delivery: OrderDelivery
+  delivery: OrderDelivery,
+  options?: PlaceOrderOptions
 ): Promise<PlaceOrderResult> {
   if (items.length === 0) return { ok: false, message: "Your cart is empty." };
   for (const item of items) {
-    if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
+    if (!Number.isInteger(item.quantity) || item.quantity <= 0 || item.quantity > MAX_ITEM_QUANTITY) {
       return { ok: false, message: "Invalid item quantity in cart." };
     }
   }
@@ -120,6 +211,33 @@ export async function placeOrder(
     ? { delivery_address_line: savedAddress.address_line, delivery_unit: savedAddress.unit, delivery_notes: savedAddress.notes }
     : { delivery_address_line: quote.address, delivery_unit: newDetails.unit, delivery_notes: newDetails.notes };
 
+  // "Save this address" runs after the order exists and never fails it.
+  const finish = async (orderId: string): Promise<PlaceOrderResult> => {
+    if (!savedAddress && delivery.saveAddress) {
+      const addressSaved = await saveNewAddress(supabase, user.id, postalCode, quote, newDetails, delivery.saveLabel);
+      return { ok: true, orderId, addressSaved };
+    }
+    return { ok: true, orderId };
+  };
+
+  const placed = await placeOrderThroughRpc({
+    customerId: user.id,
+    kitchenId,
+    items,
+    delivery: {
+      delivery_type: delivery.deliveryType,
+      lat: quote.lat,
+      lng: quote.lng,
+      postal_code: postalCode,
+      scheduled_for: schedule.scheduledFor ?? null,
+      address_line: snapshot.delivery_address_line,
+      unit: snapshot.delivery_unit,
+      notes: snapshot.delivery_notes,
+    },
+    options,
+  });
+  if (placed) return placed.ok ? finish(placed.orderId) : placed;
+
   const { data: menuItems, error: menuError } = await supabase
     .from("menu_items")
     .select("id, name, price")
@@ -166,11 +284,7 @@ export async function placeOrder(
     .insert(orderItems.map((i) => ({ ...i, order_id: order.id })));
   if (itemsError) return { ok: false, message: `Couldn't save order items: ${itemsError.message}` };
 
-  if (!savedAddress && delivery.saveAddress) {
-    const addressSaved = await saveNewAddress(supabase, user.id, postalCode, quote, newDetails, delivery.saveLabel);
-    return { ok: true, orderId: order.id, addressSaved };
-  }
-  return { ok: true, orderId: order.id };
+  return finish(order.id);
 }
 
 /**

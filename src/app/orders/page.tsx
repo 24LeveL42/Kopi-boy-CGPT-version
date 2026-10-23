@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { BottomNav } from "@/components/BottomNav";
 import { BRAND_NAME } from "@/lib/brand";
+import { orderFoodTotal } from "@/lib/order-pricing";
 import {
   formatTimestamp,
   getStage,
@@ -117,7 +118,7 @@ export default async function OrdersPage() {
                             </p>
                           )}
                         </div>
-                        <span className="shrink-0 text-sm font-semibold">${order.subtotal.toFixed(2)}</span>
+                        <span className="shrink-0 text-sm font-semibold">${orderFoodTotal(order).toFixed(2)}</span>
                       </div>
                       <p className="mt-3 inline-flex rounded-full px-3 py-1 text-[11px] font-extrabold" style={STAGE_STYLE[stage.tone]}>
                         {stage.message}

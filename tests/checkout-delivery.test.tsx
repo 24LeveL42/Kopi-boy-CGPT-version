@@ -8,6 +8,7 @@ import { placeOrder } from "@/lib/order-actions";
 const push = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }), usePathname: () => "/cart" }));
 vi.mock("@/lib/order-actions", () => ({ placeOrder: vi.fn() }));
+vi.mock("@/lib/pricing-actions", () => ({ quoteOrderPricing: vi.fn(async () => null) }));
 vi.mock("@/lib/delivery-actions", () => ({ quoteDelivery: vi.fn() }));
 vi.mock("@/lib/kitchen-actions", () => ({ isKitchenBlocked: vi.fn(async () => false) }));
 
@@ -138,6 +139,10 @@ describe("Checkout — postal-code delivery fee", () => {
       notes: "",
       saveAddress: true,
       saveLabel: "Home",
+    }, {
+      // A fresh id for this attempt, and exactly the food total and fee shown.
+      requestId: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/),
+      expected: { foodTotal: 2, deliveryFee: 3.3 },
     });
   });
 
