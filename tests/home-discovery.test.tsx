@@ -226,6 +226,43 @@ describe("HomeCarousel", () => {
     expect(container.querySelector(".kb-hero-banner-backdrop")).toBeNull();
   });
 
+  it("keeps going forward past the last slide, and back past the first, instead of rewinding", () => {
+    render(<HomeCarousel slides={slides} allCooksId="all-cooks" />);
+    const track = screen.getByRole("region", { name: /Featured on/ }).querySelector<HTMLElement>(".kb-hero-track")!;
+    let left = 0;
+    Object.defineProperty(track, "clientWidth", { configurable: true, value: 100 });
+    Object.defineProperty(track, "scrollLeft", { configurable: true, get: () => left, set: (v: number) => void (left = v) });
+    const scrollTo = vi.fn();
+    track.scrollTo = scrollTo as never;
+
+    // A hidden copy of the first slide follows the last one.
+    const frames = track.querySelectorAll(".kb-hero-frame");
+    expect(frames).toHaveLength(4);
+    expect(frames[3]).toHaveAttribute("aria-hidden", "true");
+    expect(frames[3]).toHaveAttribute("inert");
+
+    fireEvent.click(dots()[2]);
+    left = 200;
+    fireEvent.click(screen.getByRole("button", { name: "Next slide" }));
+    expect(scrollTo).toHaveBeenLastCalledWith({ left: 300, behavior: "smooth" }); // onto the copy, still moving forward
+    expect(active()).toBe(0);
+    left = 300;
+    fireEvent.scroll(track);
+    expect(left).toBe(0); // swapped to the real first slide
+    expect(active()).toBe(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Previous slide" }));
+    expect(left).toBe(300); // jumped to the copy...
+    expect(scrollTo).toHaveBeenLastCalledWith({ left: 200, behavior: "smooth" }); // ...and glides back to the last slide
+    fireEvent.scroll(track);
+    expect(left).toBe(300); // not swapped away mid-glide
+    left = 250;
+    fireEvent.scroll(track);
+    left = 200;
+    fireEvent.scroll(track);
+    expect(active()).toBe(2);
+  });
+
   it("shows a banner for 4 seconds and every other slide for 5", () => {
     vi.useFakeTimers();
     render(<HomeCarousel slides={[...BRAND_ONLY, cookingNearby, realPeople]} allCooksId="all-cooks" />);

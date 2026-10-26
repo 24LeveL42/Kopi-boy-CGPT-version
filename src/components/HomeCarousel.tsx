@@ -45,6 +45,10 @@ function Slide({ slide, allCooksId }: { slide: HeroSlide; allCooksId: string | n
  * (<LogoCard/>, unchanged) and sets the height; every other slide is
  * absolutely positioned inside the same box, so nothing on the page moves.
  * Brand banners stay BRAND_IMAGE_INTERVAL_MS, every other slide HERO_INTERVAL_MS.
+ * The loop never runs backwards: a copy of the first slide sits after the
+ * last, so going on from the last slides onto the copy and then swaps to the
+ * real first slide (they look the same), and going back from the first does
+ * the reverse.
  * Swipe is native scroll-snap; a mouse can drag, scroll sideways, use the
  * hover arrows, the dots or the arrow keys. Autoplay (src/lib/carousel-
  * timer.ts) pauses while touched, hovered or focused and while the tab is
@@ -58,6 +62,7 @@ export function HomeCarousel({ slides, allCooksId }: { slides: HeroSlide[]; allC
   const slidesRef = useRef(slides);
   const drag = useRef<{ x: number; left: number; moved: boolean } | null>(null);
   const suppressClick = useRef(false);
+  const backWrap = useRef(false);
   const [index, setIndex] = useState(0);
   const count = slides.length;
   const current = Math.min(index, count - 1);
@@ -67,10 +72,17 @@ export function HomeCarousel({ slides, allCooksId }: { slides: HeroSlide[]; allC
     const n = countRef.current;
     if (!track || n < 1) return;
     const next = ((target % n) + n) % n;
+    const smooth = !reducedMotion();
+    const wrap = smooth && n > 1 && (target === n || target === -1);
+    // Back from the first slide: jump to its copy at the end, then glide back to the last.
+    if (wrap && target === -1) {
+      backWrap.current = true;
+      track.scrollLeft = n * track.clientWidth;
+    }
     indexRef.current = next;
     setIndex(next);
-    const left = next * track.clientWidth;
-    if (typeof track.scrollTo === "function") track.scrollTo({ left, behavior: reducedMotion() ? "auto" : "smooth" });
+    const left = (wrap && target === n ? n : next) * track.clientWidth;
+    if (typeof track.scrollTo === "function") track.scrollTo({ left, behavior: smooth ? "smooth" : "auto" });
     else track.scrollLeft = left;
   }, []);
 
@@ -116,6 +128,10 @@ export function HomeCarousel({ slides, allCooksId }: { slides: HeroSlide[]; allC
   const onScroll = () => {
     const track = trackRef.current;
     if (!track || drag.current?.moved || !track.clientWidth) return;
+    const copyAt = countRef.current * track.clientWidth;
+    if (track.scrollLeft < copyAt - 1) backWrap.current = false;
+    // Landed on the copy of the first slide: swap to the real one, which looks the same.
+    else if (!backWrap.current) track.scrollLeft = 0;
     const at = Math.round(track.scrollLeft / track.clientWidth);
     if (at !== indexRef.current && at >= 0 && at < countRef.current) {
       indexRef.current = at;
@@ -151,7 +167,7 @@ export function HomeCarousel({ slides, allCooksId }: { slides: HeroSlide[]; allC
     const width = e.currentTarget.clientWidth || 1;
     const from = Math.round(d.left / width);
     const dx = e.clientX - d.x;
-    goTo(Math.max(0, Math.min(count - 1, dx < -DRAG_SWITCH_PX ? from + 1 : dx > DRAG_SWITCH_PX ? from - 1 : from)));
+    goTo(Math.max(0, Math.min(count, dx < -DRAG_SWITCH_PX ? from + 1 : dx > DRAG_SWITCH_PX ? from - 1 : from)));
     release("drag");
   };
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -194,6 +210,11 @@ export function HomeCarousel({ slides, allCooksId }: { slides: HeroSlide[]; allC
             <Slide slide={slide} allCooksId={allCooksId} />
           </div>
         ))}
+        {count > 1 && (
+          <div className="kb-hero-frame" aria-hidden inert>
+            <Slide slide={slides[0]} allCooksId={allCooksId} />
+          </div>
+        )}
       </div>
       {count > 1 && (
         <>
