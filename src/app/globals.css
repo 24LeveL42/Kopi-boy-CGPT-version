@@ -302,6 +302,11 @@ button, a { -webkit-tap-highlight-color: transparent; }
 }
 .kb-hero-arrow:focus-visible { opacity:1; pointer-events:auto; }
 @media (min-width: 640px) { .kb-hero-slide-body { padding:28px; } .kb-hero-slide-title { font-size:31px; } }
+.kb-hero-banner { background:#160c2c; }
+.kb-hero-banner-backdrop { object-fit:cover; filter:blur(18px) brightness(.5) saturate(1.1); transform:scale(1.15); }
+.kb-hero-banner-image { object-fit:contain; }
+.kb-hero-dots.is-compact button { width:13px; padding:6.5px 4px; }
+.kb-hero-dots.is-compact button.is-active { width:20px; }
 @media (prefers-reduced-motion: reduce) { .kb-hero-dots button { transition:none; } }
 
 .kb-card-row { display:grid; grid-auto-flow:column; grid-auto-columns:72%; gap:12px; overflow-x:auto; padding-bottom:4px; scroll-snap-type:x mandatory; scrollbar-width:none; }

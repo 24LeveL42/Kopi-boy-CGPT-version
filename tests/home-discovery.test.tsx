@@ -4,7 +4,7 @@ import { Marketplace } from "@/components/Marketplace";
 import { HomeCarousel } from "@/components/HomeCarousel";
 import { MerchantCard } from "@/components/MerchantCard";
 import { findNearbyKitchenIds } from "@/lib/home-actions";
-import { BRAND_ONLY, type HeroSlide } from "@/lib/hero-slides";
+import { BRAND_IMAGE_SLIDES, BRAND_ONLY, type HeroSlide } from "@/lib/hero-slides";
 import type { DealsFeed, KitchenDeal } from "@/lib/deals";
 import type { Merchant } from "@/lib/types";
 
@@ -100,7 +100,7 @@ describe("Marketplace — Phase A discovery (display only)", () => {
   it("adds new-kitchen slides to the hero carousel once the location is resolved", async () => {
     render(<Marketplace merchants={MERCHANTS} />);
     const carousel = screen.getByRole("region", { name: /Featured on/ });
-    await waitFor(() => expect(within(carousel).getAllByRole("group")).toHaveLength(3));
+    await waitFor(() => expect(within(carousel).getAllByRole("group")).toHaveLength(3 + 5));
     const links = within(carousel).getAllByRole("link", { hidden: true }).map((a) => a.getAttribute("href"));
     expect(links).toEqual(expect.arrayContaining(["/merchant/new-1", "/merchant/new-2"]));
   });
@@ -140,7 +140,9 @@ describe("MerchantCard deal badge", () => {
 });
 
 describe("HomeCarousel", () => {
-  const slides: HeroSlide[] = [...BRAND_ONLY, { type: "new-kitchen", key: "new-a", kitchen: kitchen("a"), image: "/categories/hawkers.jpg" }, { type: "fallback", key: "fallback" }];
+  const newSlide = (id: string): HeroSlide => ({ type: "new-kitchen", key: `new-${id}`, kitchen: kitchen(id), image: "/categories/hawkers.jpg" });
+  const slides: HeroSlide[] = [...BRAND_ONLY, newSlide("a"), newSlide("b")];
+  const [cookingNearby, realPeople] = BRAND_IMAGE_SLIDES;
   const dots = () => screen.getAllByRole("button", { name: /Show slide/ });
   const active = () => dots().findIndex((d) => d.getAttribute("aria-current") === "true");
 
@@ -202,10 +204,38 @@ describe("HomeCarousel", () => {
     expect(groups.map((g) => g.hasAttribute("inert"))).toEqual([true, true, false]);
   });
 
-  it("links the fallback slide to All Cooks & Stalls only when that list is on the page", () => {
-    const { rerender } = render(<HomeCarousel slides={[...BRAND_ONLY, { type: "fallback", key: "fallback" }]} allCooksId="all-cooks" />);
-    expect(screen.getByRole("link", { hidden: true, name: /Browse all cooks/ })).toHaveAttribute("href", "#all-cooks");
-    rerender(<HomeCarousel slides={[...BRAND_ONLY, { type: "fallback", key: "fallback" }]} allCooksId={null} />);
-    expect(screen.queryByRole("link", { hidden: true, name: /Browse all cooks/ })).toBeNull();
+  it("links only the cooking-nearby banner, to All Cooks & Stalls, and only when that list is on the page", () => {
+    const banners = [...BRAND_ONLY, cookingNearby, realPeople];
+    const { rerender } = render(<HomeCarousel slides={banners} allCooksId="all-cooks" />);
+    expect(screen.getByRole("link", { hidden: true, name: /cooking nearby/ })).toHaveAttribute("href", "#all-cooks");
+    expect(screen.getByRole("img", { hidden: true, name: /Real people/ }).closest("a")).toBeNull();
+    rerender(<HomeCarousel slides={banners} allCooksId={null} />);
+    expect(screen.queryAllByRole("link", { hidden: true })).toHaveLength(0);
+    expect(screen.getByRole("img", { hidden: true, name: /cooking nearby/ })).toBeInTheDocument();
+  });
+
+  it("shows a banner for 4 seconds and every other slide for 5", () => {
+    vi.useFakeTimers();
+    render(<HomeCarousel slides={[...BRAND_ONLY, cookingNearby, realPeople]} allCooksId="all-cooks" />);
+    act(() => void vi.advanceTimersByTime(5_000));
+    expect(active()).toBe(1);
+    act(() => void vi.advanceTimersByTime(3_999));
+    expect(active()).toBe(1);
+    act(() => void vi.advanceTimersByTime(1));
+    expect(active()).toBe(2);
+    act(() => void vi.advanceTimersByTime(4_000));
+    expect(active()).toBe(0);
+    act(() => void vi.advanceTimersByTime(4_999));
+    expect(active()).toBe(0);
+    act(() => void vi.advanceTimersByTime(1));
+    expect(active()).toBe(1);
+  });
+
+  it("uses smaller dots once there are more than 8 slides", () => {
+    const { rerender } = render(<HomeCarousel slides={[...BRAND_ONLY, ...BRAND_IMAGE_SLIDES]} allCooksId="all-cooks" />);
+    expect(dots()[0].parentElement).not.toHaveClass("is-compact");
+    rerender(<HomeCarousel slides={[...slides, newSlide("c"), newSlide("d"), newSlide("e"), ...BRAND_IMAGE_SLIDES]} allCooksId="all-cooks" />);
+    expect(dots()).toHaveLength(11);
+    expect(dots()[0].parentElement).toHaveClass("is-compact");
   });
 });

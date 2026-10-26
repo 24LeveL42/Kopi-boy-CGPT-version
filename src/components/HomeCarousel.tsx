@@ -2,13 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BRAND_NAME } from "@/lib/brand";
-import { AutoplayTimer, type HoldReason } from "@/lib/carousel-timer";
+import { AutoplayTimer, BRAND_IMAGE_INTERVAL_MS, HERO_INTERVAL_MS, type HoldReason } from "@/lib/carousel-timer";
 import type { HeroSlide } from "@/lib/hero-slides";
 import { LogoCard } from "./LogoCard";
-import { FallbackSlide, FlashSlide, NewKitchenSlide, PromotionSlide } from "./HeroSlides";
+import { BrandImageSlide, FlashSlide, NewKitchenSlide, PromotionSlide } from "./HeroSlides";
 
 const DRAG_START_PX = 6;
 const DRAG_SWITCH_PX = 40;
+/** Past this many slides the dots shrink, so the corner stays tidy. */
+const COMPACT_DOTS_OVER = 8;
 
 function reducedMotion(): boolean {
   return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
@@ -33,8 +35,8 @@ function Slide({ slide, allCooksId }: { slide: HeroSlide; allCooksId: string | n
       return <PromotionSlide kitchen={slide.kitchen} deal={slide.deal} image={slide.image} />;
     case "flash":
       return <FlashSlide kitchen={slide.kitchen} deal={slide.deal} image={slide.image} />;
-    case "fallback":
-      return <FallbackSlide allCooksId={allCooksId} />;
+    case "brand-image":
+      return <BrandImageSlide src={slide.src} alt={slide.alt} href={slide.linksToAllCooks && allCooksId ? `#${allCooksId}` : null} />;
   }
 }
 
@@ -42,6 +44,7 @@ function Slide({ slide, allCooksId }: { slide: HeroSlide; allCooksId: string | n
  * The home hero as a carousel. Slide A is the existing brand hero
  * (<LogoCard/>, unchanged) and sets the height; every other slide is
  * absolutely positioned inside the same box, so nothing on the page moves.
+ * Brand banners stay BRAND_IMAGE_INTERVAL_MS, every other slide HERO_INTERVAL_MS.
  * Swipe is native scroll-snap; a mouse can drag, scroll sideways, use the
  * hover arrows, the dots or the arrow keys. Autoplay (src/lib/carousel-
  * timer.ts) pauses while touched, hovered or focused and while the tab is
@@ -52,6 +55,7 @@ export function HomeCarousel({ slides, allCooksId }: { slides: HeroSlide[]; allC
   const timerRef = useRef<AutoplayTimer | null>(null);
   const indexRef = useRef(0);
   const countRef = useRef(slides.length);
+  const slidesRef = useRef(slides);
   const drag = useRef<{ x: number; left: number; moved: boolean } | null>(null);
   const suppressClick = useRef(false);
   const [index, setIndex] = useState(0);
@@ -71,7 +75,10 @@ export function HomeCarousel({ slides, allCooksId }: { slides: HeroSlide[]; allC
   }, []);
 
   useEffect(() => {
-    const timer = new AutoplayTimer(() => goTo(indexRef.current + 1));
+    const timer = new AutoplayTimer(
+      () => goTo(indexRef.current + 1),
+      () => (slidesRef.current[indexRef.current]?.type === "brand-image" ? BRAND_IMAGE_INTERVAL_MS : HERO_INTERVAL_MS)
+    );
     timerRef.current = timer;
     const motion = window.matchMedia?.("(prefers-reduced-motion: reduce)");
     const sync = () => timer.setEnabled(countRef.current > 1 && !motion?.matches);
@@ -87,6 +94,10 @@ export function HomeCarousel({ slides, allCooksId }: { slides: HeroSlide[]; allC
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [goTo]);
+
+  useEffect(() => {
+    slidesRef.current = slides;
+  }, [slides]);
 
   // Slides arrive after the page loads (location, live data): keep the timer and position in step.
   useEffect(() => {
@@ -192,7 +203,7 @@ export function HomeCarousel({ slides, allCooksId }: { slides: HeroSlide[]; allC
           <button type="button" className="kb-hero-arrow is-next" aria-label="Next slide" onClick={() => pick(current + 1)}>
             ›
           </button>
-          <div className="kb-hero-dots">
+          <div className={count > COMPACT_DOTS_OVER ? "kb-hero-dots is-compact" : "kb-hero-dots"}>
             {slides.map((slide, i) => (
               <button key={slide.key} type="button" aria-label={`Show slide ${i + 1} of ${count}`} aria-current={i === current ? "true" : undefined} className={i === current ? "is-active" : undefined} onClick={() => pick(i)} />
             ))}

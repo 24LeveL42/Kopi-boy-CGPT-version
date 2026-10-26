@@ -7,10 +7,10 @@ import { describeDeal, dealHref, formatEndsIn, type KitchenDeal } from "@/lib/de
 import type { Merchant } from "@/lib/types";
 
 /**
- * Hero carousel slides built from live kitchen data — no uploaded banners,
- * no invented wording. Every slide fills the brand hero's box exactly
- * (.kb-hero-slide is absolutely positioned), so swapping slides never moves
- * the page. Images are lazy: only the brand slide's photo loads up front.
+ * Hero carousel slides built from live kitchen data — no invented wording —
+ * plus the designed brand banners. Every slide fills the brand hero's box
+ * exactly (.kb-hero-slide is absolutely positioned), so swapping slides never
+ * moves the page. Images are lazy: only the brand slide's photo loads up front.
  */
 
 const SIZES = "(max-width:768px) 100vw, 700px";
@@ -86,14 +86,24 @@ export function FlashSlide({ kitchen, deal, image }: { kitchen: Merchant; deal: 
   );
 }
 
-/** Shown after the brand slide when there's nothing live to feature. Links to the list below only when that list is on the page. */
-export function FallbackSlide({ allCooksId }: { allCooksId: string | null }) {
-  return (
-    <SlideFrame href={allCooksId ? `#${allCooksId}` : null} image="/categories/hawkers.jpg">
-      <p className="kb-hero-slide-kicker">HOME COOKS · HAWKERS · BAKERS</p>
-      <h2 className="kb-hero-slide-title">Something good is cooking nearby.</h2>
-      <p className="kb-hero-slide-text">Order straight from the people who make it.</p>
-      {allCooksId && <span className="kb-hero-slide-cta">Browse all cooks &amp; stalls →</span>}
-    </SlideFrame>
+/**
+ * A designed banner (logo and headline drawn in). It is wider than the hero
+ * box, so it is shown whole — never cropped — over a blurred, darkened copy
+ * of itself that fills the bands above and below. Same src and sizes, so the
+ * browser downloads it once.
+ */
+export function BrandImageSlide({ src, alt, href }: { src: string; alt: string; href: string | null }) {
+  const body = (
+    <>
+      <Image src={src} alt="" fill sizes={SIZES} className="kb-hero-banner-backdrop" draggable={false} aria-hidden />
+      <Image src={src} alt={alt} fill sizes={SIZES} className="kb-hero-banner-image" draggable={false} />
+    </>
+  );
+  return href ? (
+    <Link href={href} className="kb-hero-slide kb-hero-banner" draggable={false}>
+      {body}
+    </Link>
+  ) : (
+    <div className="kb-hero-slide kb-hero-banner">{body}</div>
   );
 }

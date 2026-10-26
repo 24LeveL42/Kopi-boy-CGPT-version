@@ -5,7 +5,7 @@ import type { KitchenDeal } from "@/lib/deals";
  * Which slides the home hero carousel shows — display only. Slide A is
  * always the brand hero. After it come flash deals, kitchen promotions and
  * new kitchens, each built from live data and at most one slide per
- * kitchen. With nothing to feature, a fallback slide follows the brand.
+ * kitchen. The brand banners always close the loop, outside that limit.
  */
 export const MAX_HERO_SLIDES = 6;
 export const MAX_FLASH_SLIDES = 2;
@@ -17,9 +17,25 @@ export type HeroSlide =
   | { type: "flash"; key: string; kitchen: Merchant; deal: KitchenDeal; image: string }
   | { type: "promotion"; key: string; kitchen: Merchant; deal: KitchenDeal; image: string }
   | { type: "new-kitchen"; key: string; kitchen: Merchant; image: string }
-  | { type: "fallback"; key: "fallback" };
+  | { type: "brand-image"; key: string; src: string; alt: string; linksToAllCooks: boolean };
 
 export const BRAND_ONLY: HeroSlide[] = [{ type: "brand", key: "brand" }];
+
+type BrandImageSlide = Extract<HeroSlide, { type: "brand-image" }>;
+
+/**
+ * The designed banners in public/brand-slides/, in the order they play. The
+ * logo and headline are baked into each picture, so the alt text repeats
+ * the wording. Only cooking-nearby has a button drawn on it, so only it is a
+ * link. The rider recruitment banner in the same folder is deliberately not used.
+ */
+export const BRAND_IMAGE_SLIDES: readonly BrandImageSlide[] = [
+  { type: "brand-image", key: "brand-image-cooking-nearby", src: "/brand-slides/cooking-nearby.png", alt: "Something good is cooking nearby. Order straight from the people who make it.", linksToAllCooks: true },
+  { type: "brand-image", key: "brand-image-real-people", src: "/brand-slides/real-people.png", alt: "Real people. Real food. Support home cooks, hawkers, bakeries and small businesses in your area.", linksToAllCooks: false },
+  { type: "brand-image", key: "brand-image-made-simple", src: "/brand-slides/made-simple.png", alt: "Your favourite food, made simple. Discover, order, track, enjoy.", linksToAllCooks: false },
+  { type: "brand-image", key: "brand-image-stronger-community", src: "/brand-slides/stronger-community.png", alt: "Good food, stronger community. Support local cooks, empower riders, and keep our neighbourhoods thriving.", linksToAllCooks: false },
+  { type: "brand-image", key: "brand-image-islandwide", src: "/brand-slides/islandwide.png", alt: "Good food islandwide. From your neighbourhood to your doorstep.", linksToAllCooks: false },
+];
 
 /** Cover photo, else the first menu photo, else the category picture. */
 export function slideImage(kitchen: Merchant): string {
@@ -83,7 +99,7 @@ export function selectHeroSlides({
 }): HeroSlide[] {
   const slides: HeroSlide[] = [...BRAND_ONLY];
   const used = new Set<string>();
-  const add = (slide: Exclude<HeroSlide, { type: "brand" | "fallback" }>) => {
+  const add = (slide: Extract<HeroSlide, { kitchen: Merchant }>) => {
     if (slides.length >= MAX_HERO_SLIDES || used.has(slide.kitchen.id) || slide.kitchen.isBlocked) return false;
     used.add(slide.kitchen.id);
     slides.push(slide);
@@ -104,6 +120,5 @@ export function selectHeroSlides({
     if (added >= MAX_NEW_KITCHEN_SLIDES) break;
     if (add({ type: "new-kitchen", key: `new-${kitchen.id}`, kitchen, image: slideImage(kitchen) })) added++;
   }
-  if (slides.length === 1) slides.push({ type: "fallback", key: "fallback" });
-  return slides;
+  return [...slides, ...BRAND_IMAGE_SLIDES];
 }
