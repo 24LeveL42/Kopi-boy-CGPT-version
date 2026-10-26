@@ -36,7 +36,7 @@ function Slide({ slide, allCooksId }: { slide: HeroSlide; allCooksId: string | n
     case "flash":
       return <FlashSlide kitchen={slide.kitchen} deal={slide.deal} image={slide.image} />;
     case "brand-image":
-      return <BrandImageSlide src={slide.src} alt={slide.alt} href={slide.linksToAllCooks && allCooksId ? `#${allCooksId}` : null} />;
+      return <BrandImageSlide src={slide.src} alt={slide.alt} focus={slide.focus} href={slide.linksToAllCooks && allCooksId ? `#${allCooksId}` : null} />;
   }
 }
 

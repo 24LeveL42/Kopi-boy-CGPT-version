@@ -17,7 +17,7 @@ export type HeroSlide =
   | { type: "flash"; key: string; kitchen: Merchant; deal: KitchenDeal; image: string }
   | { type: "promotion"; key: string; kitchen: Merchant; deal: KitchenDeal; image: string }
   | { type: "new-kitchen"; key: string; kitchen: Merchant; image: string }
-  | { type: "brand-image"; key: string; src: string; alt: string; linksToAllCooks: boolean };
+  | { type: "brand-image"; key: string; src: string; alt: string; focus: string; linksToAllCooks: boolean };
 
 export const BRAND_ONLY: HeroSlide[] = [{ type: "brand", key: "brand" }];
 
@@ -26,15 +26,17 @@ type BrandImageSlide = Extract<HeroSlide, { type: "brand-image" }>;
 /**
  * The designed banners in public/brand-slides/, in the order they play. The
  * logo and headline are baked into each picture, so the alt text repeats
- * the wording. Only cooking-nearby has a button drawn on it, so only it is a
+ * the wording. Each fills the hero box and is trimmed to fit; `focus` is the
+ * CSS object-position kept in view — the logo and headline sit on the left
+ * of every banner. Only cooking-nearby has a button drawn on it, so only it is a
  * link. The rider recruitment banner in the same folder is deliberately not used.
  */
 export const BRAND_IMAGE_SLIDES: readonly BrandImageSlide[] = [
-  { type: "brand-image", key: "brand-image-cooking-nearby", src: "/brand-slides/cooking-nearby.png", alt: "Something good is cooking nearby. Order straight from the people who make it.", linksToAllCooks: true },
-  { type: "brand-image", key: "brand-image-real-people", src: "/brand-slides/real-people.png", alt: "Real people. Real food. Support home cooks, hawkers, bakeries and small businesses in your area.", linksToAllCooks: false },
-  { type: "brand-image", key: "brand-image-made-simple", src: "/brand-slides/made-simple.png", alt: "Your favourite food, made simple. Discover, order, track, enjoy.", linksToAllCooks: false },
-  { type: "brand-image", key: "brand-image-stronger-community", src: "/brand-slides/stronger-community.png", alt: "Good food, stronger community. Support local cooks, empower riders, and keep our neighbourhoods thriving.", linksToAllCooks: false },
-  { type: "brand-image", key: "brand-image-islandwide", src: "/brand-slides/islandwide.png", alt: "Good food islandwide. From your neighbourhood to your doorstep.", linksToAllCooks: false },
+  { type: "brand-image", key: "brand-image-cooking-nearby", src: "/brand-slides/cooking-nearby.png", alt: "Something good is cooking nearby. Order straight from the people who make it.", focus: "left center", linksToAllCooks: true },
+  { type: "brand-image", key: "brand-image-real-people", src: "/brand-slides/real-people.png", alt: "Real people. Real food. Support home cooks, hawkers, bakeries and small businesses in your area.", focus: "left center", linksToAllCooks: false },
+  { type: "brand-image", key: "brand-image-made-simple", src: "/brand-slides/made-simple.png", alt: "Your favourite food, made simple. Discover, order, track, enjoy.", focus: "left center", linksToAllCooks: false },
+  { type: "brand-image", key: "brand-image-stronger-community", src: "/brand-slides/stronger-community.png", alt: "Good food, stronger community. Support local cooks, empower riders, and keep our neighbourhoods thriving.", focus: "left center", linksToAllCooks: false },
+  { type: "brand-image", key: "brand-image-islandwide", src: "/brand-slides/islandwide.png", alt: "Good food islandwide. From your neighbourhood to your doorstep.", focus: "left center", linksToAllCooks: false },
 ];
 
 /** Cover photo, else the first menu photo, else the category picture. */

@@ -87,18 +87,12 @@ export function FlashSlide({ kitchen, deal, image }: { kitchen: Merchant; deal: 
 }
 
 /**
- * A designed banner (logo and headline drawn in). It is wider than the hero
- * box, so it is shown whole — never cropped — over a blurred, darkened copy
- * of itself that fills the bands above and below. Same src and sizes, so the
- * browser downloads it once.
+ * A designed banner (logo and headline drawn in). It fills the hero box like
+ * every other slide; being wider than the box, it is trimmed, keeping
+ * `focus` (an object-position) in view.
  */
-export function BrandImageSlide({ src, alt, href }: { src: string; alt: string; href: string | null }) {
-  const body = (
-    <>
-      <Image src={src} alt="" fill sizes={SIZES} className="kb-hero-banner-backdrop" draggable={false} aria-hidden />
-      <Image src={src} alt={alt} fill sizes={SIZES} className="kb-hero-banner-image" draggable={false} />
-    </>
-  );
+export function BrandImageSlide({ src, alt, focus, href }: { src: string; alt: string; focus: string; href: string | null }) {
+  const body = <Image src={src} alt={alt} fill sizes={SIZES} className="kb-hero-banner-image" style={{ objectPosition: focus }} draggable={false} />;
   return href ? (
     <Link href={href} className="kb-hero-slide kb-hero-banner" draggable={false}>
       {body}

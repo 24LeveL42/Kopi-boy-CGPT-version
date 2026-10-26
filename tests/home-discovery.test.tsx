@@ -214,6 +214,18 @@ describe("HomeCarousel", () => {
     expect(screen.getByRole("img", { hidden: true, name: /cooking nearby/ })).toBeInTheDocument();
   });
 
+  it("draws each banner once, filling the card from its own focal point, with no blurred backdrop", () => {
+    const tuned = { ...realPeople, focus: "30% center" };
+    const { container } = render(<HomeCarousel slides={[...BRAND_ONLY, cookingNearby, tuned]} allCooksId="all-cooks" />);
+    const banners = [...container.querySelectorAll(".kb-hero-banner")];
+    expect(banners).toHaveLength(2);
+    expect(banners.map((b) => b.querySelectorAll("img").length)).toEqual([1, 1]);
+    const imgs = banners.map((b) => b.querySelector("img")!);
+    expect(imgs.map((i) => i.className)).toEqual(["kb-hero-banner-image", "kb-hero-banner-image"]);
+    expect(imgs.map((i) => i.style.objectPosition)).toEqual(["left center", "30% center"]);
+    expect(container.querySelector(".kb-hero-banner-backdrop")).toBeNull();
+  });
+
   it("shows a banner for 4 seconds and every other slide for 5", () => {
     vi.useFakeTimers();
     render(<HomeCarousel slides={[...BRAND_ONLY, cookingNearby, realPeople]} allCooksId="all-cooks" />);

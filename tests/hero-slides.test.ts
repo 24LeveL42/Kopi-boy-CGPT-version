@@ -83,6 +83,7 @@ describe("BRAND_IMAGE_SLIDES", () => {
     expect(BRAND_IMAGE_SLIDES.filter((s) => s.linksToAllCooks).map((s) => s.key)).toEqual(["brand-image-cooking-nearby"]);
     for (const slide of BRAND_IMAGE_SLIDES) {
       expect(slide.alt.length).toBeGreaterThan(20);
+      expect(slide.focus).toBe("left center"); // logo and headline are on the left of every banner
       expect(existsSync(join(process.cwd(), "public", slide.src))).toBe(true);
     }
   });
