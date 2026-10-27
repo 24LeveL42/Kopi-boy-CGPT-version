@@ -102,6 +102,20 @@ export function pickActiveDelivery(deliveries: DeliveryRequestRow[]): DeliveryRe
 }
 
 /**
+ * Finished = cancelled, rejected, or delivered (a completed delivery_request;
+ * order_status stays 'accepted'). The same rule as hide_my_order /
+ * hide_all_my_past_orders (docs/supabase-clear-orders.sql) and the archive
+ * cap (schema section 27): only these may be removed from the order list.
+ */
+export function isOrderFinished(order: Pick<OrderRow, "order_status">, deliveries: DeliveryRequestRow[]): boolean {
+  return (
+    order.order_status === "cancelled" ||
+    order.order_status === "rejected" ||
+    deliveries.some((d) => d.status === "completed")
+  );
+}
+
+/**
  * Maps order_status/preparation_status/delivery_requests to the single-line
  * stage message + timestamp the customer sees, per the locked stage list:
  * placed -> accepted+preparing -> ready -> rider assigned -> food collected

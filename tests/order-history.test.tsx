@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import OrdersPage from "@/app/orders/page";
 import { CartProvider } from "@/lib/cart-context";
 
@@ -35,7 +35,16 @@ vi.mock("@/lib/supabase/server", () => ({
     },
   }),
 }));
-vi.mock("next/navigation", () => ({ usePathname: () => "/orders" }));
+const actions = vi.hoisted(() => ({
+  hideMyOrder: vi.fn<(orderId: string) => Promise<{ ok: true } | { ok: false; message: string }>>(async () => ({ ok: true })),
+  hideAllMyPastOrders: vi.fn(async () => ({ ok: true }) as { ok: true } | { ok: false; message: string }),
+  refresh: vi.fn(),
+}));
+vi.mock("@/lib/order-actions", () => ({
+  hideMyOrder: actions.hideMyOrder,
+  hideAllMyPastOrders: actions.hideAllMyPastOrders,
+}));
+vi.mock("next/navigation", () => ({ usePathname: () => "/orders", useRouter: () => ({ refresh: actions.refresh }) }));
 
 function row(overrides: Record<string, unknown> = {}) {
   return {
@@ -64,8 +73,14 @@ beforeEach(() => {
   db.rows = [];
   db.filteredError = null;
   db.queries = [];
+  actions.hideMyOrder.mockClear();
+  actions.hideAllMyPastOrders.mockClear();
+  actions.refresh.mockClear();
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 describe("/orders — order history", () => {
   it("queries the customer's 10 newest NON-archived orders", async () => {
@@ -157,5 +172,78 @@ describe("/orders — order history", () => {
   it("marks the Orders tab as current in the bottom nav", async () => {
     await renderPage();
     expect(screen.getByRole("link", { name: /Orders/ })).toHaveAttribute("aria-current", "page");
+  });
+});
+
+describe("/orders — removing past orders", () => {
+  const CONFIRM = "This only removes them from your list. Kitchens keep their records.";
+  const delivered = { order_status: "accepted", preparation_status: "ready", delivery_requests: [{ status: "completed", accepted_at: "t", completed_at: "t2" }] };
+
+  it("offers Remove only on finished orders (cancelled, rejected, delivered)", async () => {
+    db.rows = [
+      row({ id: "placed" }),
+      row({ id: "accepted", order_status: "accepted" }),
+      row({ id: "ready", order_status: "accepted", preparation_status: "ready" }),
+      row({ id: "riding", order_status: "accepted", preparation_status: "ready", delivery_requests: [{ status: "accepted", accepted_at: "t", completed_at: null, picked_up_at: "t1" }] }),
+      row({ id: "rider-dropped", order_status: "accepted", preparation_status: "ready", delivery_requests: [{ status: "cancelled", accepted_at: "t", completed_at: null }] }),
+      row({ id: "delivered", ...delivered }),
+      row({ id: "cancelled", order_status: "cancelled" }),
+      row({ id: "rejected", order_status: "rejected" }),
+    ];
+    await renderPage();
+    const cards = screen.getAllByTestId("order-history-row").map((link) => link.closest("li")!);
+    const withRemove = cards.filter((li) => li.querySelector('[data-testid="remove-order"]')).map((li) => li.querySelector("a")!.getAttribute("href"));
+    expect(withRemove).toEqual(["/orders/delivered", "/orders/cancelled", "/orders/rejected"]);
+    // The button sits beside the link, never inside it.
+    expect(screen.getAllByTestId("order-history-row").some((a) => a.querySelector("button"))).toBe(false);
+  });
+
+  it("shows Clear all only when a finished order is listed", async () => {
+    db.rows = [row({ id: "placed" }), row({ id: "accepted", order_status: "accepted" })];
+    await renderPage();
+    expect(screen.queryByTestId("clear-past-orders")).not.toBeInTheDocument();
+    cleanup();
+    db.rows = [row({ id: "placed" }), row({ id: "cancelled", order_status: "cancelled" })];
+    await renderPage();
+    expect(screen.getByTestId("clear-past-orders")).toHaveTextContent("Clear all past orders");
+  });
+
+  it("Remove asks first with the agreed text, then hides that order and refreshes", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    db.rows = [row({ id: "o9", order_status: "cancelled" })];
+    await renderPage();
+    fireEvent.click(screen.getByTestId("remove-order"));
+    expect(confirm).toHaveBeenCalledWith(CONFIRM);
+    await waitFor(() => expect(actions.refresh).toHaveBeenCalled());
+    expect(actions.hideMyOrder).toHaveBeenCalledWith("o9");
+  });
+
+  it("does nothing when the customer cancels the confirm", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    db.rows = [row({ id: "o9", order_status: "cancelled" })];
+    await renderPage();
+    fireEvent.click(screen.getByTestId("remove-order"));
+    fireEvent.click(screen.getByTestId("clear-past-orders"));
+    expect(actions.hideMyOrder).not.toHaveBeenCalled();
+    expect(actions.hideAllMyPastOrders).not.toHaveBeenCalled();
+  });
+
+  it("Clear all asks first with the agreed text, then hides all and refreshes", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    db.rows = [row({ id: "o9", ...delivered })];
+    await renderPage();
+    fireEvent.click(screen.getByTestId("clear-past-orders"));
+    expect(confirm).toHaveBeenCalledWith(CONFIRM);
+    await waitFor(() => expect(actions.hideAllMyPastOrders).toHaveBeenCalled());
+    await waitFor(() => expect(actions.refresh).toHaveBeenCalled());
+  });
+
+  it("shows the action's message when removing isn't possible (e.g. SQL not run yet)", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    actions.hideMyOrder.mockResolvedValueOnce({ ok: false, message: "Removing orders isn't available yet — please try again later." });
+    db.rows = [row({ id: "o9", order_status: "rejected" })];
+    await renderPage();
+    fireEvent.click(screen.getByTestId("remove-order"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("isn't available yet");
   });
 });

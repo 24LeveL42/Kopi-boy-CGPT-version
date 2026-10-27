@@ -360,6 +360,54 @@ export async function cancelOrder(orderId: string): Promise<CancelOrderResult> {
   return { ok: true };
 }
 
+export type HideOrdersResult = { ok: true } | { ok: false; message: string };
+
+const HIDE_ORDERS_UNAVAILABLE = "Removing orders isn't available yet — please try again later.";
+
+/**
+ * Removes one finished order from the customer's own order list — a hide,
+ * not a delete: public.hide_my_order (docs/supabase-clear-orders.sql) only
+ * stamps customer_archived_at, and kitchens/HQ keep the row. Runs with the
+ * customer's own session so auth.uid() is them; the function itself checks
+ * ownership and the finished-only rule. Until that SQL has run, PostgREST
+ * answers PGRST202 and the customer gets HIDE_ORDERS_UNAVAILABLE.
+ * Returns a result object rather than throwing, for the same reason as
+ * cancelOrder() above.
+ */
+export async function hideMyOrder(orderId: string): Promise<HideOrdersResult> {
+  if (!isUuid(orderId)) return { ok: false, message: "This order couldn't be found." };
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: "Please sign in to manage your orders." };
+
+  const { data, error } = await supabase.rpc("hide_my_order", { p_order_id: orderId });
+  if (error?.code === "PGRST202") return { ok: false, message: HIDE_ORDERS_UNAVAILABLE };
+  if (error) return { ok: false, message: "Couldn't remove this order — please try again." };
+  if (data !== true) return { ok: false, message: "Only finished orders can be removed." };
+  return { ok: true };
+}
+
+/**
+ * Removes every finished order of the customer from their list, including
+ * ones older than the 10 the list shows (public.hide_all_my_past_orders).
+ * Orders still in progress stay. Zero hidden is still a success — the list
+ * simply refreshes.
+ */
+export async function hideAllMyPastOrders(): Promise<HideOrdersResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: "Please sign in to manage your orders." };
+
+  const { error } = await supabase.rpc("hide_all_my_past_orders");
+  if (error?.code === "PGRST202") return { ok: false, message: HIDE_ORDERS_UNAVAILABLE };
+  if (error) return { ok: false, message: "Couldn't clear your past orders — please try again." };
+  return { ok: true };
+}
+
 export type RateOrderResult = { ok: true } | { ok: false; message: string };
 
 /**

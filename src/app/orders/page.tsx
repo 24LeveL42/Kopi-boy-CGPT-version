@@ -4,9 +4,11 @@ import { createClient } from "@/lib/supabase/server";
 import { BottomNav } from "@/components/BottomNav";
 import { BRAND_NAME } from "@/lib/brand";
 import { orderFoodTotal } from "@/lib/order-pricing";
+import { ClearPastOrdersButton, RemoveOrderButton } from "@/components/RemoveOrderButton";
 import {
   formatTimestamp,
   getStage,
+  isOrderFinished,
   pickActiveDelivery,
   STAGE_STYLE,
   type DeliveryRequestRow,
@@ -33,6 +35,10 @@ export interface OrderListRow extends OrderRow {
  * filtered out HERE, not by RLS — an archived order still opens by direct
  * link, e.g. from an old notification. The status line reuses the order
  * page's getStage(), so the list and the order page never disagree.
+ *
+ * Finished orders (isOrderFinished) get a "Remove" button, and "Clear all
+ * past orders" hides every finished one — both stamp the same column through
+ * docs/supabase-clear-orders.sql, so kitchens/HQ keep the rows.
  */
 export default async function OrdersPage() {
   const supabase = await createClient();
@@ -98,14 +104,13 @@ export default async function OrdersPage() {
           <>
             <ul className="mt-5 space-y-3">
               {orders.map((order) => {
-                const stage = getStage(order, pickActiveDelivery(order.delivery_requests ?? []));
+                const deliveries = order.delivery_requests ?? [];
+                const stage = getStage(order, pickActiveDelivery(deliveries));
+                // Card styles sit on the <li> so Remove can live inside the
+                // card without being nested in the link.
                 return (
-                  <li key={order.id}>
-                    <Link
-                      href={`/orders/${order.id}`}
-                      data-testid="order-history-row"
-                      className="kb-order-history-card"
-                    >
+                  <li key={order.id} className="kb-order-history-card">
+                    <Link href={`/orders/${order.id}`} data-testid="order-history-row" className="block">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold">{order.kitchens?.business_name ?? "Kitchen"}</p>
@@ -124,10 +129,12 @@ export default async function OrdersPage() {
                         {stage.message}
                       </p>
                     </Link>
+                    {isOrderFinished(order, deliveries) && <RemoveOrderButton orderId={order.id} />}
                   </li>
                 );
               })}
             </ul>
+            {orders.some((o) => isOrderFinished(o, o.delivery_requests ?? [])) && <ClearPastOrdersButton />}
             <p className="mt-4 text-center text-xs" style={{ color: "var(--kb-on-navy-soft)" }}>
               Showing your {ORDER_HISTORY_LIMIT} most recent orders.
             </p>
