@@ -22,6 +22,7 @@ import {
 import { DELIVERY_TYPE_LABEL, isDeliveryType } from "@/lib/delivery-types";
 import { asapArrivalEstimate } from "@/lib/delivery-time";
 import { formatDealAmount, orderDiscount, orderFoodTotal } from "@/lib/order-pricing";
+import { describeOptions } from "@/lib/cart-lines";
 
 export interface OrderRow {
   id: string;
@@ -64,8 +65,45 @@ export interface OrderRow {
 interface OrderItemRow {
   id: string;
   name: string;
+  /** The dish price only; add-ons are in options_price (per unit). */
   price: number;
   quantity: number;
+  /** docs/supabase-addons.sql; absent where that query fell back. */
+  options_price?: number | string | null;
+  order_item_options?: { group_name: string; name: string; price: number | string; sort_order: number | null }[] | null;
+}
+
+/**
+ * The order's lines with their add-on snapshot (order_item_options, readable
+ * by the customer on their own orders). If that query fails, the plain
+ * select is used, so the page still shows every line as before.
+ */
+async function loadOrderItems(supabase: Awaited<ReturnType<typeof createClient>>, orderId: string) {
+  const withOptions = await supabase
+    .from("order_items")
+    .select("id, name, price, quantity, options_price, order_item_options(group_name, name, price, sort_order)")
+    .eq("order_id", orderId)
+    .order("id")
+    .returns<OrderItemRow[]>();
+  if (!withOptions.error) return withOptions;
+  return supabase.from("order_items").select("id, name, price, quantity").eq("order_id", orderId).order("id").returns<OrderItemRow[]>();
+}
+
+const money = (v: unknown) => {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+};
+
+/** One line's amount: (dish + add-ons) × quantity. */
+function lineAmount(item: OrderItemRow): number {
+  return Math.round((Number(item.price) + money(item.options_price)) * item.quantity * 100) / 100;
+}
+
+/** The line's picks in the order the customer saw them. */
+function lineOptions(item: OrderItemRow) {
+  return [...(item.order_item_options ?? [])]
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+    .map((o) => ({ name: o.name, price: money(o.price) }));
 }
 
 export interface DeliveryRequestRow {
@@ -261,7 +299,7 @@ export default async function OrderConfirmationPage({
       .select("business_name, paynow_type, paynow_value")
       .eq("id", order.kitchen_id)
       .maybeSingle<{ business_name: string; paynow_type: string | null; paynow_value: string | null }>(),
-    supabase.from("order_items").select("id, name, price, quantity").eq("order_id", id).order("id").returns<OrderItemRow[]>(),
+    loadOrderItems(supabase, id),
     // "*" (same reason as the orders query above): picked_up_at only exists
     // once the Partner's pickup migration has run, and naming it would fail
     // the whole query on a project without it. The existing "Customers can
@@ -461,14 +499,22 @@ export default async function OrderConfirmationPage({
           {order.order_status === "placed" && <CancelOrderButton orderId={order.id} />}
 
           <div className="mt-5 space-y-2 text-left">
-            {(items ?? []).map((item) => (
-              <div key={item.id} className="flex justify-between text-sm">
-                <span>
-                  {item.quantity}&times; {item.name}
-                </span>
-                <span>${(item.price * item.quantity).toFixed(2)}</span>
-              </div>
-            ))}
+            {(items ?? []).map((item) => {
+              const picks = describeOptions(lineOptions(item));
+              return (
+                <div key={item.id} data-testid="order-line" className="flex justify-between gap-3 text-sm">
+                  <span className="min-w-0">
+                    {item.quantity}&times; {item.name}
+                    {picks && (
+                      <span data-testid="order-line-options" className="block text-xs" style={{ color: "var(--kb-ink-soft)" }}>
+                        {picks}
+                      </span>
+                    )}
+                  </span>
+                  <span className="shrink-0">${lineAmount(item).toFixed(2)}</span>
+                </div>
+              );
+            })}
           </div>
 
           {/* Same labels/styling as the cart page (CartView). */}

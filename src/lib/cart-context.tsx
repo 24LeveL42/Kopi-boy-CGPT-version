@@ -2,16 +2,19 @@
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Cart, CartItem } from "@/lib/types-order";
+import { lineKey, readSavedCart, unitPrice } from "@/lib/cart-lines";
 import { useIsClient } from "@/lib/use-is-client";
 
 const STORAGE_KEY = "kb-cart";
 
 interface CartContextValue {
   cart: Cart | null;
+  /** Adds one unit; the same dish with the same picks joins its line. */
   addItem: (kitchenId: string, kitchenName: string, item: Omit<CartItem, "quantity">) => void;
-  setQuantity: (menuItemId: string, quantity: number) => void;
+  /** `key` is the line's lineKey(). */
+  setQuantity: (key: string, quantity: number) => void;
   /** Deletes a whole line in one go, whatever its quantity. */
-  removeItem: (menuItemId: string) => void;
+  removeItem: (key: string) => void;
   clearCart: () => void;
   itemCount: number;
   subtotal: number;
@@ -33,13 +36,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   // Load the saved cart once, on the first client render (adjusting state
   // during render, so the stored cart shows without an extra effect pass).
+  // readSavedCart() keeps carts saved before add-ons working and drops
+  // anything malformed instead of crashing.
   if (isClient && !hydrated) {
     setHydrated(true);
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setCart(JSON.parse(raw));
+      if (raw) setCart(readSavedCart(JSON.parse(raw)));
     } catch {
-      // Private browsing, blocked storage, etc. — cart just won't persist.
+      // Private browsing, blocked storage, unreadable JSON, etc. — cart just won't persist.
     }
   }
 
@@ -62,35 +67,38 @@ export function CartProvider({ children }: { children: ReactNode }) {
         if (!ok) return;
       }
 
+      const key = lineKey(item);
       setCart((prev) => {
         const base = prev && prev.kitchenId === kitchenId ? prev : { kitchenId, kitchenName, items: [] };
-        const existing = base.items.find((i) => i.menuItemId === item.menuItemId);
+        const existing = base.items.find((i) => lineKey(i) === key);
+        const added: CartItem = { ...item, quantity: 1 };
+        if (!added.options?.length) delete added.options;
         const items = existing
-          ? base.items.map((i) => (i.menuItemId === item.menuItemId ? { ...i, quantity: i.quantity + 1 } : i))
-          : [...base.items, { ...item, quantity: 1 }];
+          ? base.items.map((i) => (lineKey(i) === key ? { ...i, quantity: i.quantity + 1 } : i))
+          : [...base.items, added];
         return { kitchenId, kitchenName, items };
       });
     },
     [cart]
   );
 
-  const setQuantity = useCallback((menuItemId: string, quantity: number) => {
+  const setQuantity = useCallback((key: string, quantity: number) => {
     setCart((prev) => {
       if (!prev) return prev;
       if (quantity <= 0) {
-        const items = prev.items.filter((i) => i.menuItemId !== menuItemId);
+        const items = prev.items.filter((i) => lineKey(i) !== key);
         return items.length > 0 ? { ...prev, items } : null;
       }
-      return { ...prev, items: prev.items.map((i) => (i.menuItemId === menuItemId ? { ...i, quantity } : i)) };
+      return { ...prev, items: prev.items.map((i) => (lineKey(i) === key ? { ...i, quantity } : i)) };
     });
   }, []);
 
-  const removeItem = useCallback((menuItemId: string) => setQuantity(menuItemId, 0), [setQuantity]);
+  const removeItem = useCallback((key: string) => setQuantity(key, 0), [setQuantity]);
 
   const clearCart = useCallback(() => setCart(null), []);
 
   const itemCount = cart?.items.reduce((sum, i) => sum + i.quantity, 0) ?? 0;
-  const subtotal = cart?.items.reduce((sum, i) => sum + i.price * i.quantity, 0) ?? 0;
+  const subtotal = Math.round((cart?.items.reduce((sum, i) => sum + unitPrice(i) * i.quantity, 0) ?? 0) * 100) / 100;
 
   return (
     <CartContext.Provider value={{ cart, addItem, setQuantity, removeItem, clearCart, itemCount, subtotal }}>

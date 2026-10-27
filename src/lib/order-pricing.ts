@@ -49,6 +49,33 @@ export interface OrderPricing {
    * above 0, so a cart without add-ons parses exactly as before.
    */
   optionsSubtotal?: number;
+  /**
+   * The deal applied is a min_spend deal. Present only then, so other
+   * pricing parses exactly as before. min_spend counts dishes only.
+   */
+  minSpendDeal?: true;
+}
+
+/** The cart's quote: pricing, an add-on pick the server refuses, or null (no quote). */
+export type CartQuote = OrderPricing | { addOnProblem: string } | null;
+
+export const ADDON_UNAVAILABLE = "One of your add-ons is no longer available. Please check your choices.";
+
+/**
+ * What compute_order_pricing raises about add-on picks (docs/supabase-addons.sql),
+ * worded for the customer — used by placeOrder and by the cart's quote.
+ */
+export const ADD_ON_ERRORS: readonly (readonly [string, string])[] = [
+  ["option_sold_out", "One of the add-ons you picked has just sold out. Please check your choices."],
+  ["option_required_missing", "Please make a choice for every required option."],
+  ["option_too_many", "You've picked too many options for one of your dishes."],
+  ["option_not_for_item", ADDON_UNAVAILABLE],
+  ["invalid_option", ADDON_UNAVAILABLE],
+];
+
+/** The customer's wording for an add-on error, or null when it's something else. */
+export function addOnErrorMessage(message: string | null | undefined): string | null {
+  return ADD_ON_ERRORS.find(([name]) => message?.includes(name))?.[1] ?? null;
 }
 
 /**
@@ -118,6 +145,7 @@ export function parseOrderPricing(raw: unknown): OrderPricing | null {
     foodTotal,
     promotionLabel: label,
     ...(Number.isFinite(optionsSubtotal) && optionsSubtotal > 0 ? { optionsSubtotal } : {}),
+    ...(row.promotion_kind === "min_spend" ? { minSpendDeal: true as const } : {}),
   };
 }
 

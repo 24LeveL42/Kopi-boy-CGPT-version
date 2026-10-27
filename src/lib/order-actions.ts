@@ -10,6 +10,8 @@ import { canAddAddress, isAddressId, validateAddressDetails, validateAddressInpu
 import { validateScheduledFor } from "@/lib/delivery-time";
 import { isUuid } from "@/lib/order-push";
 import {
+  ADDON_UNAVAILABLE,
+  ADD_ON_ERRORS,
   hasOptions,
   hasValidOptionIds,
   parsePricingChange,
@@ -65,13 +67,12 @@ function isMissingColumn(error: { code?: string } | null): boolean {
   return error?.code === "PGRST204" || error?.code === "42703";
 }
 
-const ADDON_UNAVAILABLE = "One of your add-ons is no longer available. Please check your choices.";
 /** The old insert path can't price or record add-ons, so it refuses them. */
 const ADDONS_NOT_LIVE = "Add-ons aren't available yet. Please remove them and try again.";
 
 // What place_order raises, worded for the customer. Matched by name in the
 // error message, like the quote_delivery errors in src/lib/delivery-quote.ts.
-const PLACE_ORDER_ERRORS: [string, string][] = [
+const PLACE_ORDER_ERRORS: (readonly [string, string])[] = [
   ["kitchen_blocked", UNAVAILABLE_ORDER_MESSAGE],
   ["kitchen_unavailable", "This kitchen isn't accepting orders right now."],
   ["item_unavailable", "One of the items in your cart is no longer available."],
@@ -82,11 +83,7 @@ const PLACE_ORDER_ERRORS: [string, string][] = [
   ["invalid_location", deliveryQuoteMessage("invalid_location")],
   ["invalid_schedule", "That delivery time has passed. Please choose another one."],
   // Add-ons (docs/supabase-addons.sql).
-  ["option_sold_out", "One of the add-ons you picked has just sold out. Please check your choices."],
-  ["option_required_missing", "Please make a choice for every required option."],
-  ["option_too_many", "You've picked too many options for one of your dishes."],
-  ["option_not_for_item", ADDON_UNAVAILABLE],
-  ["invalid_option", ADDON_UNAVAILABLE],
+  ...ADD_ON_ERRORS,
   ["order_too_large", "This order is too large. Please split it into smaller orders."],
 ];
 

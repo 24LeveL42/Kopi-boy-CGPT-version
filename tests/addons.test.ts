@@ -155,6 +155,15 @@ describe("quoteOrderPricing with add-ons", () => {
     expect(pricing).toEqual({ subtotal: 20, optionsSubtotal: 7, discountTotal: 2.6, foodTotal: 17.4, promotionLabel: "20% off" });
   });
 
+  it("says which add-on rule failed, so the cart can hold checkout", async () => {
+    rpc.mockResolvedValue({ data: null, error: { code: "P0001", message: "option_sold_out" } });
+    await expect(quoteOrderPricing("k1", [{ menuItemId: "m1", quantity: 1, optionIds: [HOT] }])).resolves.toEqual({
+      addOnProblem: "One of the add-ons you picked has just sold out. Please check your choices.",
+    });
+    rpc.mockResolvedValue({ data: null, error: { code: "P0001", message: "kitchen_unavailable" } });
+    await expect(quoteOrderPricing("k1", [{ menuItemId: "m1", quantity: 1 }])).resolves.toBeNull();
+  });
+
   it("is null for malformed picks, without asking the database", async () => {
     await expect(quoteOrderPricing("k1", [{ menuItemId: "m1", quantity: 1, optionIds: ["x"] }])).resolves.toBeNull();
     expect(rpc).not.toHaveBeenCalled();

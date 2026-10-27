@@ -16,7 +16,8 @@ const db = vi.hoisted(() => ({
 }));
 
 // Just enough of the query builder for the merchant page: kitchens and the
-// rating summary end in maybeSingle(), menu_items is awaited after order().
+// rating summary end in maybeSingle(), menu_items is awaited after order(),
+// add-on groups end in returns() (none here).
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({
     from(table: string) {
@@ -24,6 +25,7 @@ vi.mock("@/lib/supabase/server", () => ({
       for (const m of ["select", "eq", "order"]) builder[m] = () => builder;
       builder.maybeSingle = async () => ({ data: table === "kitchens" ? db.kitchen : null, error: null });
       builder.then = (resolve: (v: unknown) => void) => resolve({ data: db.menuItems, error: null });
+      builder.returns = async () => ({ data: [], error: null });
       return builder;
     },
   }),

@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { CartProvider, useCart } from "@/lib/cart-context";
+import { lineKey } from "@/lib/cart-lines";
 import { CartButton } from "@/components/CartButton";
 import { CartView } from "@/components/CartView";
 import { complaintPhotoPath, normalizeComplaintBody, validateComplaintPhoto } from "@/lib/complaints";
@@ -58,7 +59,7 @@ describe("CartButton (universal header)", () => {
   it("updates live as items are removed elsewhere in the app", async () => {
     function RemoveKopi() {
       const { removeItem } = useCart();
-      return <button onClick={() => removeItem("m1")}>remove kopi</button>;
+      return <button onClick={() => removeItem(lineKey({ menuItemId: "m1" }))}>remove kopi</button>;
     }
     renderWithCart(
       <>
