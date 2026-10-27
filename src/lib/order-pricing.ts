@@ -5,7 +5,12 @@
  * what the customer pays for the food. Orders without a deal, and every
  * order placed before PART 2 ran, have no discount, so they read and show
  * exactly as before. Client-safe: no Supabase calls here.
+ *
+ * Add-ons (docs/supabase-addons.sql) are part of subtotal, but deals only
+ * ever discount dish prices.
  */
+
+import { isUuid } from "@/lib/order-push";
 
 export interface OrderMoney {
   subtotal: number;
@@ -39,6 +44,51 @@ export interface OrderPricing {
   discountTotal: number;
   foodTotal: number;
   promotionLabel: string | null;
+  /**
+   * Add-ons' share of subtotal (docs/supabase-addons.sql). Present only when
+   * above 0, so a cart without add-ons parses exactly as before.
+   */
+  optionsSubtotal?: number;
+}
+
+/**
+ * A cart line as placeOrder / quoteOrderPricing take it. optionIds: the
+ * add-ons picked for each unit of the dish (docs/supabase-addons.sql); none
+ * or [] = a plain dish.
+ */
+export interface CartLineInput {
+  menuItemId: string;
+  quantity: number;
+  optionIds?: string[];
+}
+
+/** The same cap as normalize_order_items in docs/supabase-addons.sql. */
+const MAX_OPTIONS_PER_LINE = 50;
+
+/** optionIds is absent, or a list of distinct option UUIDs. */
+export function hasValidOptionIds(item: Pick<CartLineInput, "optionIds">): boolean {
+  const ids = item?.optionIds;
+  if (ids === undefined || ids === null) return true;
+  if (!Array.isArray(ids) || ids.length > MAX_OPTIONS_PER_LINE || !ids.every(isUuid)) return false;
+  return new Set(ids.map((id) => id.toLowerCase())).size === ids.length;
+}
+
+export function hasOptions(item: Pick<CartLineInput, "optionIds">): boolean {
+  return Array.isArray(item?.optionIds) && item.optionIds.length > 0;
+}
+
+/**
+ * p_items for place_order and quote_order_pricing. Only ids and quantities —
+ * never a price or name, even if the browser adds one. option_ids goes only
+ * on lines that have picks, so a cart without add-ons sends exactly the shape
+ * it always has (and works on a database without the add-ons SQL).
+ */
+export function toRpcItems(items: CartLineInput[]): { menu_item_id: string; quantity: number; option_ids?: string[] }[] {
+  return items.map((i) => ({
+    menu_item_id: String(i?.menuItemId ?? ""),
+    quantity: i?.quantity,
+    ...(hasOptions(i) ? { option_ids: i.optionIds!.map(String) } : {}),
+  }));
 }
 
 /** place_order's pricing_changed: the numbers the order would be placed at now. */
@@ -61,7 +111,14 @@ export function parseOrderPricing(raw: unknown): OrderPricing | null {
   const foodTotal = finite(row.food_total);
   if (![subtotal, discountTotal, foodTotal].every(Number.isFinite) || discountTotal < 0 || foodTotal < 0) return null;
   const label = typeof row.promotion_label === "string" && row.promotion_label.trim() ? row.promotion_label.trim() : null;
-  return { subtotal, discountTotal, foodTotal, promotionLabel: label };
+  const optionsSubtotal = finite(row.options_subtotal);
+  return {
+    subtotal,
+    discountTotal,
+    foodTotal,
+    promotionLabel: label,
+    ...(Number.isFinite(optionsSubtotal) && optionsSubtotal > 0 ? { optionsSubtotal } : {}),
+  };
 }
 
 /** The checkout's confirm dialog when place_order answers pricing_changed. */

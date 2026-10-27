@@ -9,7 +9,15 @@ import { UNAVAILABLE_ORDER_MESSAGE } from "@/lib/kitchen-availability";
 import { canAddAddress, isAddressId, validateAddressDetails, validateAddressInput } from "@/lib/addresses";
 import { validateScheduledFor } from "@/lib/delivery-time";
 import { isUuid } from "@/lib/order-push";
-import { parsePricingChange, type ExpectedPricing, type PricingChange } from "@/lib/order-pricing";
+import {
+  hasOptions,
+  hasValidOptionIds,
+  parsePricingChange,
+  toRpcItems,
+  type CartLineInput,
+  type ExpectedPricing,
+  type PricingChange,
+} from "@/lib/order-pricing";
 
 export type PlaceOrderResult =
   | { ok: true; orderId: string; addressSaved?: boolean }
@@ -57,6 +65,10 @@ function isMissingColumn(error: { code?: string } | null): boolean {
   return error?.code === "PGRST204" || error?.code === "42703";
 }
 
+const ADDON_UNAVAILABLE = "One of your add-ons is no longer available. Please check your choices.";
+/** The old insert path can't price or record add-ons, so it refuses them. */
+const ADDONS_NOT_LIVE = "Add-ons aren't available yet. Please remove them and try again.";
+
 // What place_order raises, worded for the customer. Matched by name in the
 // error message, like the quote_delivery errors in src/lib/delivery-quote.ts.
 const PLACE_ORDER_ERRORS: [string, string][] = [
@@ -69,6 +81,13 @@ const PLACE_ORDER_ERRORS: [string, string][] = [
   ["kitchen_location_missing", deliveryQuoteMessage("kitchen_location_missing")],
   ["invalid_location", deliveryQuoteMessage("invalid_location")],
   ["invalid_schedule", "That delivery time has passed. Please choose another one."],
+  // Add-ons (docs/supabase-addons.sql).
+  ["option_sold_out", "One of the add-ons you picked has just sold out. Please check your choices."],
+  ["option_required_missing", "Please make a choice for every required option."],
+  ["option_too_many", "You've picked too many options for one of your dishes."],
+  ["option_not_for_item", ADDON_UNAVAILABLE],
+  ["invalid_option", ADDON_UNAVAILABLE],
+  ["order_too_large", "This order is too large. Please split it into smaller orders."],
 ];
 
 const PRICING_CHANGED_MESSAGE = "The price of your order has changed. Please check the new total.";
@@ -93,7 +112,7 @@ function expectedPricing(expected: ExpectedPricing | null | undefined): { food_t
 async function placeOrderThroughRpc(args: {
   customerId: string;
   kitchenId: string;
-  items: { menuItemId: string; quantity: number }[];
+  items: CartLineInput[];
   delivery: Record<string, unknown>;
   options: PlaceOrderOptions | undefined;
 }): Promise<PlaceOrderResult | null> {
@@ -103,7 +122,7 @@ async function placeOrderThroughRpc(args: {
   const { data, error } = await admin.rpc("place_order", {
     p_customer_id: args.customerId,
     p_kitchen_id: args.kitchenId,
-    p_items: args.items.map((i) => ({ menu_item_id: i.menuItemId, quantity: i.quantity })),
+    p_items: toRpcItems(args.items),
     p_delivery: args.delivery,
     p_expected: expectedPricing(args.options?.expected),
     p_request_id: isUuid(args.options?.requestId) ? args.options.requestId : null,
@@ -147,6 +166,11 @@ async function placeOrderThroughRpc(args: {
  * Until then (or without the service-role key) the order is inserted the old
  * way below, unchanged.
  *
+ * Add-ons (docs/supabase-addons.sql): a line may carry optionIds, the
+ * add-ons picked for each unit. Only their ids go to place_order, which
+ * prices and checks them from the database. The old insert path can't, so a
+ * cart with add-ons is refused there instead of placed without them.
+ *
  * Returns a result object rather than throwing, for the same reason as
  * cancelOrder() below (thrown messages are redacted in production), and
  * returns the new order id rather than calling redirect() itself — the
@@ -154,7 +178,7 @@ async function placeOrderThroughRpc(args: {
  */
 export async function placeOrder(
   kitchenId: string,
-  items: { menuItemId: string; quantity: number }[],
+  items: CartLineInput[],
   delivery: OrderDelivery,
   options?: PlaceOrderOptions
 ): Promise<PlaceOrderResult> {
@@ -163,6 +187,7 @@ export async function placeOrder(
     if (!Number.isInteger(item.quantity) || item.quantity <= 0 || item.quantity > MAX_ITEM_QUANTITY) {
       return { ok: false, message: "Invalid item quantity in cart." };
     }
+    if (!hasValidOptionIds(item)) return { ok: false, message: ADDON_UNAVAILABLE };
   }
   if (!isDeliveryType(delivery?.deliveryType)) return { ok: false, message: "Choose Normal or Express delivery." };
   const schedule = validateScheduledFor(delivery.scheduledFor, new Date());
@@ -237,6 +262,10 @@ export async function placeOrder(
     options,
   });
   if (placed) return placed.ok ? finish(placed.orderId) : placed;
+
+  // Below is the pre-place_order insert, which knows nothing about add-ons:
+  // placing a line with picks here would drop them (and their price).
+  if (items.some(hasOptions)) return { ok: false, message: ADDONS_NOT_LIVE };
 
   const { data: menuItems, error: menuError } = await supabase
     .from("menu_items")
