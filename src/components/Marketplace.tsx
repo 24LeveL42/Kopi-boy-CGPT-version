@@ -12,7 +12,6 @@ import { useNow } from "@/lib/use-now";
 import { useNearbyKitchens } from "@/lib/use-nearby-kitchens";
 import { selectNewKitchens } from "@/lib/new-kitchens";
 import { NO_DEALS, dealBadges, selectTodaysDeals, showableDeals, type DealsFeed } from "@/lib/deals";
-import { BRAND_ONLY, readVisitorOffset, rotationSeed, selectHeroSlides } from "@/lib/hero-slides";
 import { SearchBar } from "./SearchBar";
 import { CategoryGrid } from "./CategoryGrid";
 import { CuisineFilter } from "./CuisineFilter";
@@ -45,7 +44,7 @@ export function Marketplace({ merchants, deals = NO_DEALS }: { merchants: Mercha
   const popular = useMemo(() => [...withDistance].sort((a, b) => Number(!!a.isBlocked) - Number(!!b.isBlocked) || b.rating - a.rating).slice(0, 6), [withDistance]);
   const isBrowsing = query.trim() !== "" || category !== "all" || cuisine !== "all";
 
-  // Display-only discovery: new kitchens, deals (hidden until the deals data source exists) and the hero carousel.
+  // Display-only discovery: new kitchens and deals (hidden until the deals data source exists).
   const isClient = useIsClient();
   const now = useNow(60_000);
   const nearby = useNearbyKitchens(merchants, coords);
@@ -57,19 +56,12 @@ export function Marketplace({ merchants, deals = NO_DEALS }: { merchants: Mercha
   const nearbyDeals = useMemo(() => (nearby.ready ? liveDeals.filter((d) => !nearby.nearbyIds || nearby.nearbyIds.has(d.kitchenId)) : []), [nearby.ready, nearby.nearbyIds, liveDeals]);
   const badges = useMemo(() => dealBadges(liveDeals), [liveDeals]);
   const todaysDeals = useMemo(() => selectTodaysDeals(nearbyDeals, null), [nearbyDeals]);
-  const visitorOffset = useMemo(() => (isClient ? readVisitorOffset() : 0), [isClient]);
-  const heroSlides = useMemo(
-    () =>
-      isClient && nearby.ready
-        ? selectHeroSlides({ flashDeals: nearbyDeals.filter((d) => d.kind === "flash"), promotions: nearbyDeals.filter((d) => d.kind !== "flash"), newKitchens: newNearby, merchantsById, seed: rotationSeed(visitorOffset) })
-        : BRAND_ONLY,
-    [isClient, nearby.ready, nearbyDeals, newNearby, merchantsById, visitorOffset]
-  );
 
   return <div className="kb-app-shell min-h-screen pb-28">
     <div className="mx-auto max-w-3xl px-4 pb-2 pt-3 sm:px-6 lg:px-8">
       <TopBar location="Nearby" />
-      <HomeCarousel slides={heroSlides} allCooksId={isBrowsing ? null : ALL_COOKS_ID} />
+      {/* Images only (src/lib/hero-slides.ts HERO_IMAGES); the brand card and deal / new-kitchen slides are no longer shown here. */}
+      <HomeCarousel allCooksId={isBrowsing ? null : ALL_COOKS_ID} />
       <div className="mt-4"><SearchBar value={query} onChange={setQuery} /></div>
       <div className="mt-4"><CategoryGrid active={category} onSelect={setCategory} /></div>
       <div className="mt-3"><CuisineFilter cuisines={CUISINES} active={cuisine} onSelect={setCuisine} /></div>

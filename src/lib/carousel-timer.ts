@@ -1,29 +1,24 @@
-/** The hero carousel moves on every 5 seconds, and waits 5 seconds after the customer lets go. */
-export const HERO_INTERVAL_MS = 5_000;
-export const HERO_RESUME_MS = 5_000;
-/** The designed brand banners have one line to read, so they move on sooner. */
-export const BRAND_IMAGE_INTERVAL_MS = 4_000;
-
-export type HoldReason = "touch" | "hover" | "focus" | "drag";
+/** Every hero slide stays exactly this long, then the next one comes in. */
+export const HERO_SLIDE_MS = 4_000;
+/** How long the slide-in takes (the CSS transition on .kb-hero-frame); part of the 4 seconds, not added to them. */
+export const HERO_SLIDE_MOVE_MS = 600;
 
 /**
  * Autoplay for the hero carousel, kept free of React and the DOM so it can
- * be tested with fake timers. It only runs while enabled (more than one
- * slide, no reduced-motion preference), the tab is visible and nothing is
- * holding it (a finger, the mouse, keyboard focus, a drag). Letting go
- * waits HERO_RESUME_MS before the next slide. The interval can be a function,
- * asked each time a slide starts, so each slide can stay for its own time.
+ * be tested with fake timers. It moves on every HERO_SLIDE_MS while enabled
+ * (more than one slide) and never pauses for a finger, the mouse or keyboard
+ * focus. The only pause is while the browser tab is hidden, where nobody can
+ * see it; when the tab is visible again the current slide gets a full
+ * HERO_SLIDE_MS.
  */
 export class AutoplayTimer {
-  private holds = new Set<HoldReason>();
   private enabled = false;
   private hidden = false;
   private timer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private readonly onAdvance: () => void,
-    private readonly intervalMs: number | (() => number) = HERO_INTERVAL_MS,
-    private readonly resumeDelayMs = HERO_RESUME_MS
+    private readonly intervalMs = HERO_SLIDE_MS
   ) {}
 
   get running(): boolean {
@@ -33,28 +28,13 @@ export class AutoplayTimer {
   setEnabled(enabled: boolean) {
     if (enabled === this.enabled) return;
     this.enabled = enabled;
-    this.schedule(this.interval());
+    this.schedule();
   }
 
   setHidden(hidden: boolean) {
     if (hidden === this.hidden) return;
     this.hidden = hidden;
-    this.schedule(this.interval());
-  }
-
-  hold(reason: HoldReason) {
-    this.holds.add(reason);
-    this.clear();
-  }
-
-  release(reason: HoldReason) {
-    if (!this.holds.delete(reason)) return;
-    this.schedule(this.resumeDelayMs);
-  }
-
-  /** After the customer picks a slide (dot, arrow key): a full interval before the next one. */
-  restart() {
-    this.schedule(this.interval());
+    this.schedule();
   }
 
   dispose() {
@@ -62,22 +42,18 @@ export class AutoplayTimer {
     this.clear();
   }
 
-  private interval(): number {
-    return typeof this.intervalMs === "function" ? this.intervalMs() : this.intervalMs;
-  }
-
   private clear() {
     if (this.timer !== null) clearTimeout(this.timer);
     this.timer = null;
   }
 
-  private schedule(delay: number) {
+  private schedule() {
     this.clear();
-    if (!this.enabled || this.hidden || this.holds.size > 0) return;
+    if (!this.enabled || this.hidden) return;
     this.timer = setTimeout(() => {
       this.timer = null;
       this.onAdvance();
-      this.schedule(this.interval());
-    }, delay);
+      this.schedule();
+    }, this.intervalMs);
   }
 }

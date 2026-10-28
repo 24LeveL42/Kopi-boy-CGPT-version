@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { AutoplayTimer } from "@/lib/carousel-timer";
+import { AutoplayTimer, HERO_SLIDE_MS } from "@/lib/carousel-timer";
 
 describe("AutoplayTimer — hero carousel autoplay", () => {
   let advance: ReturnType<typeof vi.fn<() => void>>;
@@ -15,109 +15,61 @@ describe("AutoplayTimer — hero carousel autoplay", () => {
     vi.useRealTimers();
   });
 
-  it("does nothing until enabled, then moves on every 5 seconds", () => {
+  it("moves on every 4 seconds, exactly", () => {
+    expect(HERO_SLIDE_MS).toBe(4_000);
+    timer.setEnabled(true);
+    vi.advanceTimersByTime(3_999);
+    expect(advance).toHaveBeenCalledTimes(0);
+    vi.advanceTimersByTime(1);
+    expect(advance).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(3_999);
+    expect(advance).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(1);
+    expect(advance).toHaveBeenCalledTimes(2);
+  });
+
+  it("runs non-stop: 10 minutes is exactly 150 slides", () => {
+    timer.setEnabled(true);
+    vi.advanceTimersByTime(600_000);
+    expect(advance).toHaveBeenCalledTimes(150);
+  });
+
+  it("has no way to hold it: no hold, release or restart", () => {
+    expect("hold" in timer).toBe(false);
+    expect("release" in timer).toBe(false);
+    expect("restart" in timer).toBe(false);
+  });
+
+  it("does nothing until enabled (more than one slide), and stops when disabled", () => {
     vi.advanceTimersByTime(20_000);
     expect(advance).not.toHaveBeenCalled();
     timer.setEnabled(true);
-    vi.advanceTimersByTime(4_999);
-    expect(advance).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(1);
-    expect(advance).toHaveBeenCalledTimes(1);
-    vi.advanceTimersByTime(10_000);
-    expect(advance).toHaveBeenCalledTimes(3);
-  });
-
-  it("pauses while touched and resumes 5 seconds after release", () => {
-    timer.setEnabled(true);
-    vi.advanceTimersByTime(3_000);
-    timer.hold("touch");
-    vi.advanceTimersByTime(60_000);
-    expect(advance).not.toHaveBeenCalled();
-    timer.release("touch");
-    vi.advanceTimersByTime(4_999);
-    expect(advance).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(1);
-    expect(advance).toHaveBeenCalledTimes(1);
-  });
-
-  it("stays paused until every hold is released (touch + hover + focus)", () => {
-    timer.setEnabled(true);
-    timer.hold("touch");
-    timer.hold("hover");
-    timer.hold("focus");
-    timer.release("touch");
-    timer.release("hover");
-    vi.advanceTimersByTime(30_000);
-    expect(advance).not.toHaveBeenCalled();
-    timer.release("focus");
-    vi.advanceTimersByTime(5_000);
-    expect(advance).toHaveBeenCalledTimes(1);
-  });
-
-  it("ignores a release without a matching hold", () => {
-    timer.setEnabled(true);
     vi.advanceTimersByTime(4_000);
-    timer.release("touch");
-    vi.advanceTimersByTime(1_000);
     expect(advance).toHaveBeenCalledTimes(1);
-  });
-
-  it("pauses while the tab is hidden and picks up again when it's visible", () => {
-    timer.setEnabled(true);
-    timer.setHidden(true);
-    vi.advanceTimersByTime(60_000);
-    expect(advance).not.toHaveBeenCalled();
-    expect(timer.running).toBe(false);
-    timer.setHidden(false);
-    vi.advanceTimersByTime(5_000);
-    expect(advance).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not resume on release while the tab is still hidden", () => {
-    timer.setEnabled(true);
-    timer.hold("touch");
-    timer.setHidden(true);
-    timer.release("touch");
-    vi.advanceTimersByTime(60_000);
-    expect(advance).not.toHaveBeenCalled();
-  });
-
-  it("stops completely when disabled (one slide, or reduced motion)", () => {
-    timer.setEnabled(true);
     timer.setEnabled(false);
-    vi.advanceTimersByTime(60_000);
-    expect(advance).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(20_000);
+    expect(advance).toHaveBeenCalledTimes(1);
+    expect(timer.running).toBe(false);
   });
 
-  it("asks for each slide's own time: 4 seconds for a banner, 5 for anything else", () => {
-    timer.dispose();
-    const times = [4_000, 5_000, 4_000];
-    let at = 0;
-    timer = new AutoplayTimer(() => { advance(); at++; }, () => times[at % times.length]);
+  it("pauses only while the tab is hidden, then gives the slide a full 4 seconds", () => {
     timer.setEnabled(true);
+    vi.advanceTimersByTime(2_000);
+    timer.setHidden(true);
+    vi.advanceTimersByTime(60_000);
+    expect(advance).not.toHaveBeenCalled();
+    timer.setHidden(false);
     vi.advanceTimersByTime(3_999);
     expect(advance).not.toHaveBeenCalled();
     vi.advanceTimersByTime(1);
     expect(advance).toHaveBeenCalledTimes(1);
-    vi.advanceTimersByTime(4_999);
-    expect(advance).toHaveBeenCalledTimes(1);
-    vi.advanceTimersByTime(1);
-    expect(advance).toHaveBeenCalledTimes(2);
-    // Letting go still waits the usual 5 seconds, whatever the slide.
-    timer.hold("touch");
-    timer.release("touch");
-    vi.advanceTimersByTime(4_999);
-    expect(advance).toHaveBeenCalledTimes(2);
-    vi.advanceTimersByTime(1);
-    expect(advance).toHaveBeenCalledTimes(3);
   });
 
-  it("restarts the full interval after the customer picks a slide", () => {
+  it("ignores repeated calls that change nothing (no restart of the 4 seconds)", () => {
     timer.setEnabled(true);
-    vi.advanceTimersByTime(4_000);
-    timer.restart();
-    vi.advanceTimersByTime(4_000);
-    expect(advance).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(3_000);
+    timer.setEnabled(true);
+    timer.setHidden(false);
     vi.advanceTimersByTime(1_000);
     expect(advance).toHaveBeenCalledTimes(1);
   });

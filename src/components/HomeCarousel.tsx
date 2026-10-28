@@ -1,236 +1,142 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
 import { BRAND_NAME } from "@/lib/brand";
-import { AutoplayTimer, BRAND_IMAGE_INTERVAL_MS, HERO_INTERVAL_MS, type HoldReason } from "@/lib/carousel-timer";
-import type { HeroSlide } from "@/lib/hero-slides";
-import { LogoCard } from "./LogoCard";
-import { BrandImageSlide, FlashSlide, NewKitchenSlide, PromotionSlide } from "./HeroSlides";
+import { AutoplayTimer, HERO_SLIDE_MOVE_MS } from "@/lib/carousel-timer";
+import { HERO_IMAGES, nextHeroImage, showingHeroImages, type HeroImage } from "@/lib/hero-slides";
 
-const DRAG_START_PX = 6;
-const DRAG_SWITCH_PX = 40;
-/** Past this many slides the dots shrink, so the corner stays tidy. */
-const COMPACT_DOTS_OVER = 8;
+const SIZES = "(max-width: 600px) 100vw, 560px";
 
-function reducedMotion(): boolean {
-  return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+interface CarouselState {
+  /** The slide on show. */
+  current: string;
+  /** The slide moving out to the left, until its move is over. */
+  leaving: string | null;
+  /** The next slide, loaded ahead of time so it never slides in blank. */
+  upNext: string;
+  /** The images in rotation (seasonal ones only inside their window), for the dots and labels. */
+  showing: string[];
 }
 
-/** Keyboard focus pauses autoplay; a mouse click that leaves focus on a dot doesn't keep it paused. */
-function keyboardFocus(el: Element): boolean {
-  try {
-    return el.matches(":focus-visible");
-  } catch {
-    return true;
-  }
+function stateAt(current: string, leaving: string | null, now: number, images: readonly HeroImage[]): CarouselState {
+  return {
+    current,
+    leaving,
+    upNext: nextHeroImage(current, now, images).key,
+    showing: showingHeroImages(now, images).map((image) => image.key),
+  };
 }
 
-function Slide({ slide, allCooksId }: { slide: HeroSlide; allCooksId: string | null }) {
-  switch (slide.type) {
-    case "brand":
-      return <LogoCard />;
-    case "new-kitchen":
-      return <NewKitchenSlide kitchen={slide.kitchen} image={slide.image} />;
-    case "promotion":
-      return <PromotionSlide kitchen={slide.kitchen} deal={slide.deal} image={slide.image} />;
-    case "flash":
-      return <FlashSlide kitchen={slide.kitchen} deal={slide.deal} image={slide.image} />;
-    case "brand-image":
-      return <BrandImageSlide src={slide.src} alt={slide.alt} focus={slide.focus} href={slide.linksToAllCooks && allCooksId ? `#${allCooksId}` : null} />;
-  }
+/** The first image is the page's largest picture, so it is preloaded; the rest are lazy, except the one coming in next. */
+function HeroImageSlide({ image, href, eager, first }: { image: HeroImage; href: string | null; eager: boolean; first: boolean }) {
+  const picture = (
+    <Image
+      src={image.src}
+      alt={image.alt}
+      fill
+      sizes={SIZES}
+      preload={first}
+      fetchPriority={first ? "high" : undefined}
+      loading={first || eager ? "eager" : "lazy"}
+      className="kb-hero-image"
+      style={{ transform: `scale(${image.zoom})`, transformOrigin: image.zoomOrigin }}
+      draggable={false}
+    />
+  );
+  return href ? (
+    <Link href={href} className="kb-hero-slide" draggable={false}>
+      {picture}
+    </Link>
+  ) : (
+    <div className="kb-hero-slide">{picture}</div>
+  );
 }
 
 /**
- * The home hero as a carousel. Slide A is the existing brand hero
- * (<LogoCard/>, unchanged) and sets the height; every other slide is
- * absolutely positioned inside the same box, so nothing on the page moves.
- * Brand banners stay BRAND_IMAGE_INTERVAL_MS, every other slide HERO_INTERVAL_MS.
- * The loop never runs backwards: a copy of the first slide sits after the
- * last, so going on from the last slides onto the copy and then swaps to the
- * real first slide (they look the same), and going back from the first does
- * the reverse.
- * Swipe is native scroll-snap; a mouse can drag, scroll sideways, use the
- * hover arrows, the dots or the arrow keys. Autoplay (src/lib/carousel-
- * timer.ts) pauses while touched, hovered or focused and while the tab is
- * hidden, and is off with prefers-reduced-motion.
+ * The home hero: the designed images in HERO_IMAGES, one at a time in a
+ * fixed 16:9 frame (560px wide at most), so the page never moves.
+ *
+ * Every slide stays exactly 4 seconds, non-stop: nothing pauses it except a
+ * hidden browser tab. It only ever moves forward — the next slide comes in
+ * from the right and the current one leaves to the left, and after the last
+ * slide the first one comes in from the right the same way. There are no
+ * arrows, no swipe or drag and no arrow keys; the dots, in their own row
+ * under the picture so they never cover the artwork, only show the position. Seasonal images are checked against their Singapore dates at
+ * every slide change. With prefers-reduced-motion the slides change by an
+ * instant cut instead of sliding, on the same 4-second beat.
+ *
+ * The images that link (cooking-nearby and the festive ones) go to the All
+ * Cooks & Stalls list, and only while that list is on the page.
  */
-export function HomeCarousel({ slides, allCooksId }: { slides: HeroSlide[]; allCooksId: string | null }) {
-  const trackRef = useRef<HTMLDivElement>(null);
-  const timerRef = useRef<AutoplayTimer | null>(null);
-  const indexRef = useRef(0);
-  const countRef = useRef(slides.length);
-  const slidesRef = useRef(slides);
-  const drag = useRef<{ x: number; left: number; moved: boolean } | null>(null);
-  const suppressClick = useRef(false);
-  const backWrap = useRef(false);
-  const [index, setIndex] = useState(0);
-  const count = slides.length;
-  const current = Math.min(index, count - 1);
-
-  const goTo = useCallback((target: number) => {
-    const track = trackRef.current;
-    const n = countRef.current;
-    if (!track || n < 1) return;
-    const next = ((target % n) + n) % n;
-    const smooth = !reducedMotion();
-    const wrap = smooth && n > 1 && (target === n || target === -1);
-    // Back from the first slide: jump to its copy at the end, then glide back to the last.
-    if (wrap && target === -1) {
-      backWrap.current = true;
-      track.scrollLeft = n * track.clientWidth;
-    }
-    indexRef.current = next;
-    setIndex(next);
-    const left = (wrap && target === n ? n : next) * track.clientWidth;
-    if (typeof track.scrollTo === "function") track.scrollTo({ left, behavior: smooth ? "smooth" : "auto" });
-    else track.scrollLeft = left;
-  }, []);
+export function HomeCarousel({ allCooksId, images = HERO_IMAGES }: { allCooksId: string | null; images?: readonly HeroImage[] }) {
+  const [state, setState] = useState<CarouselState>(() => {
+    const now = Date.now();
+    return stateAt(showingHeroImages(now, images)[0]?.key ?? images[0].key, null, now, images);
+  });
+  const rotating = state.showing.length > 1;
 
   useEffect(() => {
-    const timer = new AutoplayTimer(
-      () => goTo(indexRef.current + 1),
-      () => (slidesRef.current[indexRef.current]?.type === "brand-image" ? BRAND_IMAGE_INTERVAL_MS : HERO_INTERVAL_MS)
-    );
-    timerRef.current = timer;
-    const motion = window.matchMedia?.("(prefers-reduced-motion: reduce)");
-    const sync = () => timer.setEnabled(countRef.current > 1 && !motion?.matches);
+    const timer = new AutoplayTimer(() => {
+      const now = Date.now();
+      setState((s) => {
+        const next = nextHeroImage(s.current, now, images).key;
+        return next === s.current ? stateAt(s.current, s.leaving, now, images) : stateAt(next, s.current, now, images);
+      });
+    });
     const onVisibility = () => timer.setHidden(document.visibilityState === "hidden");
-    sync();
     onVisibility();
-    motion?.addEventListener?.("change", sync);
+    timer.setEnabled(rotating);
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
       timer.dispose();
-      timerRef.current = null;
-      motion?.removeEventListener?.("change", sync);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [goTo]);
+  }, [images, rotating]);
 
+  // Once the old slide has left, park it back on the right (hidden), ready to come in again.
   useEffect(() => {
-    slidesRef.current = slides;
-  }, [slides]);
+    if (!state.leaving) return;
+    const leaving = state.leaving;
+    const done = setTimeout(() => setState((s) => (s.leaving === leaving ? { ...s, leaving: null } : s)), HERO_SLIDE_MOVE_MS + 100);
+    return () => clearTimeout(done);
+  }, [state.leaving]);
 
-  // Slides arrive after the page loads (location, live data): keep the timer and position in step.
-  useEffect(() => {
-    countRef.current = count;
-    if (indexRef.current >= count) goTo(0);
-    timerRef.current?.setEnabled(count > 1 && !reducedMotion());
-  }, [count, goTo]);
-
-  const hold = (reason: HoldReason) => timerRef.current?.hold(reason);
-  const release = (reason: HoldReason) => timerRef.current?.release(reason);
-  const pick = (target: number) => {
-    goTo(target);
-    timerRef.current?.restart();
-  };
-
-  const onScroll = () => {
-    const track = trackRef.current;
-    if (!track || drag.current?.moved || !track.clientWidth) return;
-    const copyAt = countRef.current * track.clientWidth;
-    if (track.scrollLeft < copyAt - 1) backWrap.current = false;
-    // Landed on the copy of the first slide: swap to the real one, which looks the same.
-    else if (!backWrap.current) track.scrollLeft = 0;
-    const at = Math.round(track.scrollLeft / track.clientWidth);
-    if (at !== indexRef.current && at >= 0 && at < countRef.current) {
-      indexRef.current = at;
-      setIndex(at);
-    }
-  };
-
-  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.pointerType !== "mouse") return hold("touch");
-    if (e.button !== 0 || count < 2) return;
-    drag.current = { x: e.clientX, left: e.currentTarget.scrollLeft, moved: false };
-  };
-  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    const d = drag.current;
-    if (!d) return;
-    const dx = e.clientX - d.x;
-    if (!d.moved) {
-      if (Math.abs(dx) < DRAG_START_PX) return;
-      d.moved = true;
-      hold("drag");
-      e.currentTarget.setPointerCapture?.(e.pointerId);
-      e.currentTarget.classList.add("is-dragging");
-    }
-    e.currentTarget.scrollLeft = d.left - dx;
-  };
-  const endPointer = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.pointerType !== "mouse") return release("touch");
-    const d = drag.current;
-    drag.current = null;
-    if (!d?.moved) return;
-    e.currentTarget.classList.remove("is-dragging");
-    suppressClick.current = true;
-    const width = e.currentTarget.clientWidth || 1;
-    const from = Math.round(d.left / width);
-    const dx = e.clientX - d.x;
-    goTo(Math.max(0, Math.min(count, dx < -DRAG_SWITCH_PX ? from + 1 : dx > DRAG_SWITCH_PX ? from - 1 : from)));
-    release("drag");
-  };
-  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-    e.preventDefault();
-    pick(indexRef.current + (e.key === "ArrowRight" ? 1 : -1));
-  };
+  const position = state.showing.indexOf(state.current);
 
   return (
-    <section
-      className="kb-hero-carousel"
-      aria-roledescription="carousel"
-      aria-label={`Featured on ${BRAND_NAME}`}
-      onPointerEnter={(e) => e.pointerType === "mouse" && hold("hover")}
-      onPointerLeave={(e) => e.pointerType === "mouse" && release("hover")}
-      onFocus={(e) => keyboardFocus(e.target) && hold("focus")}
-      onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && release("focus")}
-    >
-      <div
-        ref={trackRef}
-        className="kb-hero-track"
-        tabIndex={count > 1 ? 0 : -1}
-        aria-label={count > 1 ? "Use the left and right arrow keys to change slides" : undefined}
-        onScroll={onScroll}
-        onKeyDown={onKeyDown}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={endPointer}
-        onPointerCancel={endPointer}
-        onClickCapture={(e) => {
-          if (!suppressClick.current) return;
-          suppressClick.current = false;
-          e.preventDefault();
-          e.stopPropagation();
-        }}
-        onDragStart={(e) => e.preventDefault()}
-      >
-        {slides.map((slide, i) => (
-          <div key={slide.key} role="group" aria-roledescription="slide" aria-label={`${i + 1} of ${count}`} className="kb-hero-frame" inert={i !== current}>
-            <Slide slide={slide} allCooksId={allCooksId} />
-          </div>
-        ))}
-        {count > 1 && (
-          <div className="kb-hero-frame" aria-hidden inert>
-            <Slide slide={slides[0]} allCooksId={allCooksId} />
-          </div>
-        )}
+    <section className="kb-hero-carousel" aria-roledescription="carousel" aria-label={`Featured on ${BRAND_NAME}`}>
+      <div className="kb-hero-viewport">
+        {images.map((image, i) => {
+          const isCurrent = image.key === state.current;
+          const place = isCurrent ? "is-current" : image.key === state.leaving ? "is-leaving" : "is-waiting";
+          const n = state.showing.indexOf(image.key);
+          return (
+            <div
+              key={image.key}
+              role="group"
+              aria-roledescription="slide"
+              aria-label={n >= 0 ? `${n + 1} of ${state.showing.length}` : undefined}
+              aria-hidden={isCurrent ? undefined : true}
+              inert={!isCurrent}
+              className={`kb-hero-frame ${place}`}
+              data-key={image.key}
+            >
+              <HeroImageSlide
+                image={image}
+                href={image.linksToAllCooks && allCooksId ? `#${allCooksId}` : null}
+                eager={isCurrent || image.key === state.upNext}
+                first={i === 0}
+              />
+            </div>
+          );
+        })}
       </div>
-      {count > 1 && (
-        <>
-          <button type="button" className="kb-hero-arrow is-prev" aria-label="Previous slide" onClick={() => pick(current - 1)}>
-            ‹
-          </button>
-          <button type="button" className="kb-hero-arrow is-next" aria-label="Next slide" onClick={() => pick(current + 1)}>
-            ›
-          </button>
-          <div className={count > COMPACT_DOTS_OVER ? "kb-hero-dots is-compact" : "kb-hero-dots"}>
-            {slides.map((slide, i) => (
-              <button key={slide.key} type="button" aria-label={`Show slide ${i + 1} of ${count}`} aria-current={i === current ? "true" : undefined} className={i === current ? "is-active" : undefined} onClick={() => pick(i)} />
-            ))}
-          </div>
-        </>
-      )}
+      {/* Always there (empty for a single slide) so its height never changes. */}
+      <div className="kb-hero-dots" aria-hidden="true" data-position={position}>
+        {rotating && state.showing.map((key) => <span key={key} className={key === state.current ? "is-active" : undefined} />)}
+      </div>
     </section>
   );
 }
