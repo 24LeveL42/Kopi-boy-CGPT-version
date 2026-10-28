@@ -336,7 +336,9 @@ grant select on public.kitchen_deal_badges to anon, authenticated;
 
 -- What the hero carousel may show: running deals and new kitchens, minus HQ's
 -- exclusions. Location filtering and fair rotation are the app's job (it
--- knows the customer's address); latitude/longitude are here for that.
+-- knows the customer's address); latitude/longitude are here for that,
+-- rounded to 2 decimals (about 1.1 km) so a home kitchen's exact spot isn't
+-- public (docs/supabase-kitchen-privacy.sql).
 create or replace view public.hero_candidates
 with (security_invoker = false) as
 with settings as (select * from public.app_settings where id),
@@ -351,8 +353,8 @@ select case when d.kind = 'flash' then 'flash' else 'promotion' end as slide_kin
        k.business_name,
        k.hero_image,
        k.cuisine_type,
-       k.latitude,
-       k.longitude,
+       round(k.latitude::numeric, 2)::numeric(9,6) as latitude,
+       round(k.longitude::numeric, 2)::numeric(9,6) as longitude,
        d.title,
        d.ends_at,
        k.live_since
@@ -368,8 +370,8 @@ select 'new_kitchen',
        k.business_name,
        k.hero_image,
        k.cuisine_type,
-       k.latitude,
-       k.longitude,
+       round(k.latitude::numeric, 2)::numeric(9,6),
+       round(k.longitude::numeric, 2)::numeric(9,6),
        null::text,
        k.live_since + make_interval(days => s.new_kitchen_days),
        k.live_since

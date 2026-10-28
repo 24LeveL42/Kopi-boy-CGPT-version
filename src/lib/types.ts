@@ -35,8 +35,7 @@ export interface Merchant {
   /**
    * "Postal sector 31" (formatKitchenArea in src/lib/kitchens.ts) — the only
    * location shown to customers, never the street address or full postal
-   * code. Null until the Partner app's migration adds postal_code, or when
-   * the cook hasn't set it.
+   * code. Null when the cook hasn't set kitchens.postal_sector.
    */
   area: string | null;
   blurb: string;
@@ -47,6 +46,7 @@ export interface Merchant {
   // src/lib/use-customer-location.ts) and the kitchen has coordinates of its
   // own — computed client-side via Haversine, not stored on the kitchen row.
   distanceKm: number | null;
+  /** Rounded to 2 decimals (about 1.1 km) — never the kitchen's exact spot (loadKitchenLocations). */
   latitude: number | null;
   longitude: number | null;
   priceFrom: number; // SGD, cheapest menu item

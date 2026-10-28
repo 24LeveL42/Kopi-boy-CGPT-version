@@ -13,7 +13,7 @@ export default async function MerchantPage({ params }: { params: Promise<{ id: s
   const { id } = await params;
   const supabase = await createClient();
   const { data: kitchen } = await selectKitchens((columns) => supabase.from("kitchens").select(columns).eq("id", id).eq("is_live", true).maybeSingle<{
-    id: string; business_name: string; category: MerchantCategory; cuisine_type: string; description: string | null; postal_code?: string | null; business_uen?: string | null; hero_image?: string | null; is_blocked?: boolean;
+    id: string; business_name: string; category: MerchantCategory; cuisine_type: string; description: string | null; postal_sector?: string | null; business_uen?: string | null; hero_image?: string | null; is_blocked?: boolean;
   }>());
   if (!kitchen) notFound();
   const [{ data: menuItems }, { data: ratingSummary }, { data: optionGroups }] = await Promise.all([
@@ -30,7 +30,7 @@ export default async function MerchantPage({ params }: { params: Promise<{ id: s
       .returns<MenuOptionGroupRow[]>(),
   ]);
   const groups = groupsByMenuItem(optionGroups);
-  const area = formatKitchenArea(kitchen.postal_code);
+  const area = formatKitchenArea(kitchen.postal_sector);
   const blocked = kitchen.is_blocked === true;
   const cuisine = ({ chinese:"Chinese", halal:"Halal", indian:"Indian", western:"Western" } as Record<string,string>)[kitchen.cuisine_type] ?? kitchen.cuisine_type;
   const hero = kitchen.hero_image || ({"home-cook":"/categories/home-cooks.jpg",hawker:"/categories/hawkers.jpg",bakery:"/categories/bakers.jpg","bulk-orders":"/categories/bulk-orders.jpg",drinks:"/categories/drinks-desserts.jpg"} as Record<string,string>)[kitchen.category];

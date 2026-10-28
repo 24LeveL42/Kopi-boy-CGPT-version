@@ -23,6 +23,7 @@ import { DELIVERY_TYPE_LABEL, isDeliveryType } from "@/lib/delivery-types";
 import { asapArrivalEstimate } from "@/lib/delivery-time";
 import { formatDealAmount, orderDiscount, orderFoodTotal } from "@/lib/order-pricing";
 import { describeOptions } from "@/lib/cart-lines";
+import { loadOrderPaynow } from "@/lib/kitchens";
 
 export interface OrderRow {
   id: string;
@@ -296,9 +297,9 @@ export default async function OrderConfirmationPage({
   const [{ data: kitchen }, { data: items }, { data: deliveries }, { count: supportMessageCount }] = await Promise.all([
     supabase
       .from("kitchens")
-      .select("business_name, paynow_type, paynow_value")
+      .select("business_name")
       .eq("id", order.kitchen_id)
-      .maybeSingle<{ business_name: string; paynow_type: string | null; paynow_value: string | null }>(),
+      .maybeSingle<{ business_name: string }>(),
     loadOrderItems(supabase, id),
     // "*" (same reason as the orders query above): picked_up_at only exists
     // once the Partner's pickup migration has run, and naming it would fail
@@ -318,6 +319,10 @@ export default async function OrderConfirmationPage({
     // the rider card.
     supabase.from("complaint_messages").select("id", { count: "exact", head: true }).eq("order_id", id),
   ]);
+
+  // PayNow is only handed out once the cook accepts (get_order_paynow); before
+  // that the page just says "pay the cook via PayNow once accepted".
+  const paynow = user && order.order_status === "accepted" ? await loadOrderPaynow(supabase, id, order.kitchen_id) : null;
 
   const activeDelivery = pickActiveDelivery(deliveries ?? []);
   const stage = getStage(order, activeDelivery);
@@ -483,7 +488,7 @@ export default async function OrderConfirmationPage({
               userId={user?.id ?? ""}
               state={paymentState}
               paynowLine={
-                getPaynowInstruction(kitchen?.paynow_type ?? null, kitchen?.paynow_value ?? null) ?? "Pay the cook via PayNow"
+                getPaynowInstruction(paynow?.paynow_type ?? null, paynow?.paynow_value ?? null) ?? "Pay the cook via PayNow"
               }
               amount={total}
               paymentDueAt={order.payment_due_at ?? null}
@@ -492,7 +497,7 @@ export default async function OrderConfirmationPage({
             />
           ) : !header.failed && (
             <p className="mt-1.5 text-xs" style={{ color: "var(--kb-ink-soft)" }}>
-              {getPaymentMessage(order.payment_status, kitchen?.paynow_type ?? null, kitchen?.paynow_value ?? null)}
+              {getPaymentMessage(order.payment_status, paynow?.paynow_type ?? null, paynow?.paynow_value ?? null)}
             </p>
           )}
 

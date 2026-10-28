@@ -26,6 +26,8 @@ vi.mock("@/lib/supabase/server", () => ({
       getUser: async () => ({ data: { user: { id: "customer-1" } } }),
     },
     rpc(fn: string, args: unknown) {
+      // PayNow (get_order_paynow) isn't part of the rider card; leave it out of the log.
+      if (fn === "get_order_paynow") return Promise.resolve({ data: [], error: null });
       db.rpcCalls.push({ fn, args });
       if (fn === "get_order_active_delivery") return Promise.resolve({ data: db.activeDeliveryId, error: null });
       return Promise.resolve(db.rpcResult);

@@ -28,7 +28,9 @@ const db = vi.hoisted(() => ({
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({
     auth: { getUser: async () => ({ data: { user: { id: "customer-1" } } }) },
-    rpc: () => Promise.resolve({ data: null, error: null }),
+    // PayNow comes from get_order_paynow (docs/supabase-kitchen-privacy.sql), never the kitchen row.
+    rpc: (fn: string) =>
+      Promise.resolve({ data: fn === "get_order_paynow" ? [{ paynow_type: "uen", paynow_value: "201912345K" }] : null, error: null }),
     storage: {
       from: (bucket: string) => ({
         createSignedUrl: async (path: string) => {
@@ -40,7 +42,7 @@ vi.mock("@/lib/supabase/server", () => ({
     from(table: string) {
       const result = () => {
         if (table === "orders") return { data: db.order };
-        if (table === "kitchens") return { data: { business_name: "Aunty May", paynow_type: "uen", paynow_value: "201912345K" } };
+        if (table === "kitchens") return { data: { business_name: "Aunty May" } };
         if (table === "order_items") return { data: [{ id: "i1", name: "Kopi", price: 2, quantity: 1 }] };
         return { data: [] };
       };

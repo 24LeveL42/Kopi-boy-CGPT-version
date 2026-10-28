@@ -10,14 +10,12 @@ interface KitchenRow {
   business_name: string;
   category: Merchant["category"];
   cuisine_type: Merchant["cuisineType"];
-  /** Absent until the Partner app's business-address migration runs (see selectKitchens). */
-  postal_code?: string | null;
+  /** First two digits of the kitchen's postal code (the Partner app never exposes the full code). */
+  postal_sector?: string | null;
   description: string | null;
   hero_image: string | null;
   /** Null for home cooks; absent until the Partner app's schema section 27 runs (see selectKitchens). */
   business_uen?: string | null;
-  latitude: number | null;
-  longitude: number | null;
   /** Absent until docs/supabase-blocked-merchants.sql runs (see selectKitchens). */
   is_blocked?: boolean;
 }
@@ -55,13 +53,16 @@ const CATEGORY_FALLBACK_IMAGE: Record<Merchant["category"], string> = {
  * The kitchen columns a customer may read. Deliberately never
  * business_address: a kitchen's street address (often a home cook's home)
  * is for the rider assigned to an order, not for customers — only
- * postal_code is shown. And never "*": once the Partner app revokes SELECT
- * on business_address, `select *` fails the whole query ("permission
- * denied") instead of skipping that one column.
+ * postal_sector is shown. Never paynow_type/paynow_value, latitude/longitude
+ * or acknowledged_terms_at either: docs/supabase-kitchen-privacy.sql hides
+ * them from signed-out visitors (PayNow comes from get_order_paynow,
+ * coordinates from loadKitchenLocations). And never "*": a column the
+ * caller can't read fails the whole query ("permission denied") instead of
+ * skipping that one column.
  */
-const KITCHEN_COLUMNS = ["id", "business_name", "category", "cuisine_type", "description", "hero_image", "latitude", "longitude"];
+export const KITCHEN_COLUMNS = ["id", "business_name", "category", "cuisine_type", "description", "hero_image"];
 /** Added by Partner-app migrations that may not have run yet on a given database. */
-const OPTIONAL_KITCHEN_COLUMNS = ["business_uen", "postal_code", "is_blocked"];
+export const OPTIONAL_KITCHEN_COLUMNS = ["business_uen", "postal_sector", "is_blocked"];
 
 /**
  * Runs a kitchens query with KITCHEN_COLUMNS plus whichever optional columns
@@ -110,9 +111,48 @@ export async function loadLiveSince(supabase: ServerSupabase, kitchenIds: string
   return new Map();
 }
 
+/** 2 decimals is about 1.1 km: enough for the 8 km "near you" check, too coarse to find a home. */
+export function roundCoordinate(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.round(n * 100) / 100 : null;
+}
+
+type LocationRow = { kitchen_id?: string; id?: string; latitude: unknown; longitude: unknown };
+
+/**
+ * Kitchen coordinates for "near you", rounded to 2 decimals. Read from the
+ * kitchen_public_locations view (docs/supabase-kitchen-privacy.sql, already
+ * rounded). Before that SQL runs the view doesn't exist, so it falls back to
+ * kitchens.latitude/longitude and rounds them here, so the browser never gets
+ * exact values either way. After the SQL, signed-out visitors can't read
+ * those columns; any error just means no coordinates (no distance filter),
+ * never a broken page.
+ */
+export async function loadKitchenLocations(supabase: ServerSupabase, kitchenIds: string[]): Promise<Map<string, { latitude: number; longitude: number }>> {
+  const toMap = (rows: LocationRow[] | null) => {
+    const out = new Map<string, { latitude: number; longitude: number }>();
+    for (const r of rows ?? []) {
+      const kitchenId = r.kitchen_id ?? r.id;
+      const latitude = roundCoordinate(r.latitude);
+      const longitude = roundCoordinate(r.longitude);
+      if (kitchenId && latitude !== null && longitude !== null) out.set(kitchenId, { latitude, longitude });
+    }
+    return out;
+  };
+  const view = await supabase
+    .from("kitchen_public_locations")
+    .select("kitchen_id, latitude, longitude")
+    .in("kitchen_id", kitchenIds)
+    .returns<LocationRow[]>();
+  if (!view.error) return toMap(view.data);
+  const old = await supabase.from("kitchens").select("id, latitude, longitude").in("id", kitchenIds).returns<LocationRow[]>();
+  return old.error ? new Map() : toMap(old.data);
+}
+
 /**
  * The only location a customer sees for a kitchen: "Postal sector 31", from
- * the first two digits of postal_code — never the full 6-digit code. Works
+ * the first two digits of postal_sector — never the full 6-digit code. Works
  * whether the Partner app exposes the full code or already only the sector.
  * Null when there's no usable code.
  */
@@ -129,7 +169,7 @@ export function formatKitchenArea(postalCode: string | null | undefined): string
  * customer's own location, which this server-side fetch has no access to;
  * <Marketplace> computes it client-side (Haversine, see src/lib/distance.ts)
  * once the customer has shared their location, using the kitchen's
- * latitude/longitude passed through below. Ratings come from the
+ * rounded latitude/longitude from loadKitchenLocations. Ratings come from the
  * kitchen_rating_summary view (schema section 32); if that hasn't been
  * created yet the query errors and every kitchen just shows "No ratings
  * yet". `isNew` follows the NEW rule (src/lib/new-kitchens.ts) from
@@ -147,12 +187,13 @@ export async function getLiveMerchants(): Promise<Merchant[]> {
   if (!kitchens || kitchens.length === 0) return [];
 
   const kitchenIds = kitchens.map((k) => k.id);
-  const [{ data: items, error: itemsError }, { data: summaries }, liveSince] = await Promise.all([
+  const [{ data: items, error: itemsError }, { data: summaries }, liveSince, locations] = await Promise.all([
     supabase.from("menu_items").select("*").in("kitchen_id", kitchenIds).order("created_at", { ascending: true }).returns<MenuItemRow[]>(),
     // Deliberately not fatal: before schema section 32 runs, the view doesn't
     // exist -> error -> no summaries, and the marketplace still loads.
     supabase.from("kitchen_rating_summary").select("kitchen_id, average, rating_count").in("kitchen_id", kitchenIds).returns<RatingSummaryRow[]>(),
     loadLiveSince(supabase, kitchenIds),
+    loadKitchenLocations(supabase, kitchenIds),
   ]);
 
   if (itemsError) throw new Error(`Failed to load menu items: ${itemsError.message}`);
@@ -166,20 +207,21 @@ export async function getLiveMerchants(): Promise<Merchant[]> {
     const image = k.hero_image ?? CATEGORY_FALLBACK_IMAGE[k.category];
     const summary = summaryByKitchen.get(k.id);
     const since = liveSince.get(k.id) ?? null;
+    const location = locations.get(k.id);
 
     return {
       id: k.id,
       name: k.business_name,
       category: k.category,
       cuisine: CUISINE_LABEL[k.cuisine_type],
-      area: formatKitchenArea(k.postal_code),
+      area: formatKitchenArea(k.postal_sector),
       blurb: k.description ?? "",
       rating: summary?.average ?? 0,
       ratingCount: summary?.rating_count ?? 0,
       etaMinutes: 30,
       distanceKm: null,
-      latitude: k.latitude,
-      longitude: k.longitude,
+      latitude: location?.latitude ?? null,
+      longitude: location?.longitude ?? null,
       priceFrom: prices.length > 0 ? Math.min(...prices) : 0,
       heroImage: image,
       avatarImage: image,
@@ -194,6 +236,29 @@ export async function getLiveMerchants(): Promise<Merchant[]> {
     };
   });
   return sortAvailableFirst(merchants);
+}
+
+export interface OrderPaynow {
+  paynow_type: string | null;
+  paynow_value: string | null;
+}
+
+/**
+ * The cook's PayNow details for one order, from get_order_paynow()
+ * (docs/supabase-kitchen-privacy.sql): only for the signed-in customer of
+ * that order, and only once the cook has accepted it — kitchens.paynow_* are
+ * hidden from the public. Until that SQL runs the function doesn't exist
+ * (PGRST202 / 42883), so it falls back to reading the kitchen row as before.
+ * Any other error, or no row, is null: the page then says "pay the cook via
+ * PayNow" without a number.
+ */
+export async function loadOrderPaynow(supabase: ServerSupabase, orderId: string, kitchenId: string): Promise<OrderPaynow | null> {
+  const { data, error } = await supabase.rpc("get_order_paynow", { p_order_id: orderId });
+  // A set-returning function comes back as an array (untyped rpc(), hence the cast).
+  if (!error) return (data as OrderPaynow[] | null)?.[0] ?? null;
+  if (error.code !== "PGRST202" && error.code !== "42883") return null;
+  const old = await supabase.from("kitchens").select("paynow_type, paynow_value").eq("id", kitchenId).maybeSingle<OrderPaynow>();
+  return old.error ? null : (old.data ?? null);
 }
 
 /**
