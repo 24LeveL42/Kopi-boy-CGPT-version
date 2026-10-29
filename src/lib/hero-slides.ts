@@ -45,11 +45,9 @@ export const BRAND_IMAGE_SLIDES: readonly BrandImageSlide[] = [
  * What the home hero carousel shows: these designed images, nothing else
  * (the brand card and the deal / new-kitchen slides above are kept but no
  * longer rendered). Played in this order, each for HERO_SLIDE_MS. Logo and
- * headline are drawn on the left of every image, so the alt text repeats the
- * wording and the frame keeps the left side (object-position left center).
- * `zoom` (a CSS scale around `zoomOrigin`) trims the screenshot edges and
- * rounded corners baked into the files: the smallest zoom, per image, that
- * hides them in the 16:9 frame without cutting the logo, text or button.
+ * headline are drawn into every image, so the alt text repeats the wording.
+ * Every file is 2:1, the same shape as the hero frame, so each is shown
+ * whole: no zoom, nothing cropped.
  * A seasonal image has a `window` of Singapore dates, both days included;
  * outside it the image is skipped.
  */
@@ -58,22 +56,19 @@ export interface HeroImage {
   src: string;
   alt: string;
   linksToAllCooks: boolean;
-  zoom: number;
-  zoomOrigin: string;
   window?: { from: string; to: string };
 }
 
 export const HERO_IMAGES: readonly HeroImage[] = [
-  { key: "01-browse", src: "/hero/01-browse.webp", alt: "Something good is cooking nearby. Order straight from the people who make it. Browse all cooks and stalls.", linksToAllCooks: true, zoom: 1.04, zoomOrigin: "25% 40%" },
-  { key: "02-real-people", src: "/hero/02-real-people.webp", alt: "Real people. Real food. Support home cooks, hawkers, bakeries and small businesses in your area.", linksToAllCooks: false, zoom: 1.03, zoomOrigin: "30% 60%" },
-  { key: "03-riders", src: "/hero/03-riders.webp", alt: "Delivering goodness together. Riders keep your favourite food moving across the island: fair rates, flexible time, no commission.", linksToAllCooks: false, zoom: 1.04, zoomOrigin: "30% 75%" },
-  { key: "04-simple", src: "/hero/04-simple.webp", alt: "Your favourite food, made simple. Discover, order, track, enjoy.", linksToAllCooks: false, zoom: 1.03, zoomOrigin: "30% 70%" },
-  { key: "05-community", src: "/hero/05-community.webp", alt: "Good food, stronger community. Support local cooks, empower riders, and keep our neighbourhoods thriving.", linksToAllCooks: false, zoom: 1.105, zoomOrigin: "85% 35%" },
-  { key: "06-islandwide", src: "/hero/06-islandwide.webp", alt: "Good food islandwide. From your neighbourhood to your doorstep.", linksToAllCooks: false, zoom: 1.05, zoomOrigin: "65% 75%" },
-  { key: "07-deepavali", src: "/hero/07-deepavali.webp", alt: "Deepavali special deals. Celebrate with delicious local food from home cooks, hawkers and small businesses. Order festive food.", linksToAllCooks: true, zoom: 1.03, zoomOrigin: "20% 15%", window: { from: "2026-10-28", to: "2026-11-09" } },
-  { key: "08-cny", src: "/hero/08-cny.webp", alt: "Chinese New Year 2027 special deals. Welcome the Year of the Goat with great food and good times. Order CNY food.", linksToAllCooks: true, zoom: 1.03, zoomOrigin: "20% 45%", window: { from: "2027-01-15", to: "2027-02-17" } },
-  { key: "09-hari-raya", src: "/hero/09-hari-raya.webp", alt: "Hari Raya special deals. Enjoy delicious local food from home cooks, hawkers and small businesses. Order Raya food.", linksToAllCooks: true, zoom: 1.03, zoomOrigin: "20% 25%", window: { from: "2027-02-20", to: "2027-03-20" } },
-  { key: "10-christmas", src: "/hero/10-christmas.webp", alt: "Christmas special deals. Share the joy of good food with family and friends this festive season. Order Christmas food.", linksToAllCooks: true, zoom: 1.035, zoomOrigin: "25% 40%", window: { from: "2026-12-01", to: "2026-12-26" } },
+  { key: "01-browse", src: "/hero/01-browse.webp", alt: "Something good is cooking nearby. Order straight from the people who make it: home cooks, hawkers, bakers and small businesses. Browse all cooks and stalls.", linksToAllCooks: true },
+  { key: "02-real-people", src: "/hero/02-real-people.webp", alt: "Real people. Real food. Support home cooks, hawkers, bakeries and small businesses in your area.", linksToAllCooks: false },
+  { key: "03-simple", src: "/hero/03-simple.webp", alt: "Your favourite food, made simple. Discover, order, track, enjoy: find food near you, easy ordering, live tracking and order updates.", linksToAllCooks: false },
+  { key: "04-riders", src: "/hero/04-riders.webp", alt: "Delivering goodness together. Riders keep your favourite food moving across the island: fair rates, flexible time, no commission, be part of the community.", linksToAllCooks: false },
+  { key: "05-deepavali", src: "/hero/05-deepavali.webp", alt: "Deepavali special deals. Celebrate the Festival of Lights with delicious local food from home cooks, hawkers and small businesses.", linksToAllCooks: true, window: { from: "2026-10-28", to: "2026-11-09" } },
+  { key: "06-christmas", src: "/hero/06-christmas.webp", alt: "Christmas special deals. Enjoy delicious local food from home cooks, hawkers and small businesses.", linksToAllCooks: true, window: { from: "2026-12-01", to: "2026-12-26" } },
+  { key: "07-new-year", src: "/hero/07-new-year.webp", alt: "New Year special deals for 2027. Start the new year with delicious local food from home cooks, hawkers and small businesses.", linksToAllCooks: true, window: { from: "2026-12-27", to: "2027-01-03" } },
+  { key: "08-cny", src: "/hero/08-cny.webp", alt: "Chinese New Year 2027 special deals. Welcome the Year of the Goat with great food and good times.", linksToAllCooks: true, window: { from: "2027-01-15", to: "2027-02-17" } },
+  { key: "09-national-day", src: "/hero/09-national-day.webp", alt: "Happy National Day. Local food, stronger together: celebrating our home with delicious local food from home cooks, hawkers and small businesses.", linksToAllCooks: true, window: { from: "2027-07-20", to: "2027-08-10" } },
 ];
 
 /** Today's date in Singapore (UTC+8 all year, no daylight saving) as YYYY-MM-DD. */

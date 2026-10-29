@@ -111,22 +111,28 @@ describe("BRAND_IMAGE_SLIDES", () => {
 /** Midnight at the start of a Singapore day, as a UTC timestamp (Singapore is UTC+8 all year). */
 const sgMidnight = (day: string) => Date.parse(`${day}T00:00:00+08:00`);
 const keys = (list: { key: string }[]) => list.map((i) => i.key);
-const ALWAYS = ["01-browse", "02-real-people", "03-riders", "04-simple", "05-community", "06-islandwide"];
+const ALWAYS = ["01-browse", "02-real-people", "03-simple", "04-riders"];
+const FESTIVE = ["05-deepavali", "06-christmas", "07-new-year", "08-cny", "09-national-day"];
 
 describe("HERO_IMAGES — the carousel's images", () => {
-  it("plays the ten images in the agreed order, every file a real WebP in public/hero", () => {
-    expect(keys([...HERO_IMAGES])).toEqual([...ALWAYS, "07-deepavali", "08-cny", "09-hari-raya", "10-christmas"]);
+  it("plays the nine images in the agreed order, every file a real WebP under 300 KB in public/hero", () => {
+    expect(keys([...HERO_IMAGES])).toEqual([...ALWAYS, ...FESTIVE]);
     for (const image of HERO_IMAGES) {
       expect(image.src).toBe(`/hero/${image.key}.webp`);
       const bytes = readFileSync(join(process.cwd(), "public", image.src));
       expect(bytes.subarray(0, 4).toString("latin1")).toBe("RIFF");
       expect(bytes.subarray(8, 12).toString("latin1")).toBe("WEBP");
+      expect(bytes.length, image.key).toBeLessThan(300 * 1024);
     }
   });
 
-  it("includes the rider banner (03-riders) as the third slide, always showing", () => {
-    const riders = HERO_IMAGES[2];
-    expect(riders.key).toBe("03-riders");
+  it("keeps public/hero to exactly these nine files", () => {
+    expect(readdirSync(join(process.cwd(), "public", "hero")).sort()).toEqual(HERO_IMAGES.map((i) => `${i.key}.webp`));
+  });
+
+  it("includes the rider banner (04-riders), always showing and not a link", () => {
+    const riders = HERO_IMAGES[3];
+    expect(riders.key).toBe("04-riders");
     expect(riders.window).toBeUndefined();
     expect(riders.linksToAllCooks).toBe(false); // no rider sign-up link exists in this app
     expect(riders.alt).toMatch(/Delivering goodness together/);
@@ -135,27 +141,29 @@ describe("HERO_IMAGES — the carousel's images", () => {
   it("gives every image its wording as alt text", () => {
     for (const image of HERO_IMAGES) expect(image.alt.length, image.key).toBeGreaterThan(40);
     expect(HERO_IMAGES[0].alt).toMatch(/Something good is cooking nearby/);
+    expect(HERO_IMAGES[6].alt).toMatch(/^New Year special deals/);
+    expect(HERO_IMAGES[6].alt).not.toMatch(/Food Fest/);
     expect(HERO_IMAGES[7].alt).toMatch(/Chinese New Year 2027/);
   });
 
-  it("links cooking-nearby and the four festive images, nothing else", () => {
-    expect(keys(HERO_IMAGES.filter((i) => i.linksToAllCooks))).toEqual(["01-browse", "07-deepavali", "08-cny", "09-hari-raya", "10-christmas"]);
+  it("links 01-browse and the five festive images, nothing else", () => {
+    expect(keys(HERO_IMAGES.filter((i) => i.linksToAllCooks))).toEqual(["01-browse", ...FESTIVE]);
   });
 
-  it("zooms every image at least 3% to hide the screenshot edges, 05 the most", () => {
+  it("shows every image whole: no per-image zoom or crop", () => {
     for (const image of HERO_IMAGES) {
-      expect(image.zoom, image.key).toBeGreaterThanOrEqual(1.03);
-      expect(image.zoomOrigin).toMatch(/^\d+% \d+%$/);
+      expect(image).not.toHaveProperty("zoom");
+      expect(image).not.toHaveProperty("zoomOrigin");
     }
-    expect(Math.max(...HERO_IMAGES.map((i) => i.zoom))).toBe(HERO_IMAGES[4].zoom);
   });
 
-  it("gives the festive images their Singapore date windows; 01-06 have none", () => {
+  it("gives the festive images their Singapore date windows; 01-04 have none", () => {
     expect(Object.fromEntries(HERO_IMAGES.filter((i) => i.window).map((i) => [i.key, i.window]))).toEqual({
-      "07-deepavali": { from: "2026-10-28", to: "2026-11-09" },
+      "05-deepavali": { from: "2026-10-28", to: "2026-11-09" },
+      "06-christmas": { from: "2026-12-01", to: "2026-12-26" },
+      "07-new-year": { from: "2026-12-27", to: "2027-01-03" },
       "08-cny": { from: "2027-01-15", to: "2027-02-17" },
-      "09-hari-raya": { from: "2027-02-20", to: "2027-03-20" },
-      "10-christmas": { from: "2026-12-01", to: "2026-12-26" },
+      "09-national-day": { from: "2027-07-20", to: "2027-08-10" },
     });
   });
 });
@@ -167,10 +175,11 @@ describe("seasonal windows — Singapore time, both days included", () => {
   });
 
   const edges: [string, string, string][] = [
-    ["07-deepavali", "2026-10-28", "2026-11-09"],
+    ["05-deepavali", "2026-10-28", "2026-11-09"],
+    ["06-christmas", "2026-12-01", "2026-12-26"],
+    ["07-new-year", "2026-12-27", "2027-01-03"],
     ["08-cny", "2027-01-15", "2027-02-17"],
-    ["09-hari-raya", "2027-02-20", "2027-03-20"],
-    ["10-christmas", "2026-12-01", "2026-12-26"],
+    ["09-national-day", "2027-07-20", "2027-08-10"],
   ];
   for (const [key, from, to] of edges) {
     it(`${key}: from 00:00 on ${from} to 23:59:59 on ${to}, Singapore time`, () => {
@@ -184,10 +193,12 @@ describe("seasonal windows — Singapore time, both days included", () => {
     });
   }
 
-  it("shows only 01-06 outside every window, and adds just the one in season", () => {
+  it("shows only 01-04 outside every window, and adds just the one in season", () => {
     expect(keys(showingHeroImages(sgMidnight("2026-11-20")))).toEqual(ALWAYS);
-    expect(keys(showingHeroImages(sgMidnight("2026-12-25")))).toEqual([...ALWAYS, "10-christmas"]);
-    expect(keys(showingHeroImages(sgMidnight("2027-02-18")))).toEqual(ALWAYS); // between CNY and Hari Raya
+    expect(keys(showingHeroImages(sgMidnight("2026-12-26")))).toEqual([...ALWAYS, "06-christmas"]);
+    expect(keys(showingHeroImages(sgMidnight("2026-12-27")))).toEqual([...ALWAYS, "07-new-year"]); // Christmas hands over to New Year
+    expect(keys(showingHeroImages(sgMidnight("2027-01-10")))).toEqual(ALWAYS); // between New Year and CNY
+    expect(keys(showingHeroImages(sgMidnight("2027-08-09")))).toEqual([...ALWAYS, "09-national-day"]);
   });
 });
 
@@ -198,18 +209,18 @@ describe("nextHeroImage — forward only", () => {
   it("steps forward one image at a time and wraps from the last to the first", () => {
     let key = "01-browse";
     const seen = [key];
-    for (let i = 0; i < 7; i++) seen.push((key = nextHeroImage(key, inDeepavali).key));
-    expect(seen).toEqual([...ALWAYS, "07-deepavali", "01-browse"]);
+    for (let i = 0; i < 5; i++) seen.push((key = nextHeroImage(key, inDeepavali).key));
+    expect(seen).toEqual([...ALWAYS, "05-deepavali", "01-browse"]);
   });
 
-  it("skips a seasonal image outside its window, straight from 06 back to 01", () => {
-    expect(nextHeroImage("06-islandwide", offSeason).key).toBe("01-browse");
-    expect(nextHeroImage("06-islandwide", sgMidnight("2027-03-01")).key).toBe("09-hari-raya");
-    expect(nextHeroImage("09-hari-raya", sgMidnight("2027-03-01")).key).toBe("01-browse"); // never backwards
+  it("skips a seasonal image outside its window, straight from 04 back to 01", () => {
+    expect(nextHeroImage("04-riders", offSeason).key).toBe("01-browse");
+    expect(nextHeroImage("04-riders", sgMidnight("2027-08-01")).key).toBe("09-national-day");
+    expect(nextHeroImage("09-national-day", sgMidnight("2027-08-01")).key).toBe("01-browse"); // never backwards
   });
 
   it("moves on from a slide whose window has just closed", () => {
-    expect(nextHeroImage("07-deepavali", offSeason).key).toBe("01-browse");
+    expect(nextHeroImage("05-deepavali", offSeason).key).toBe("01-browse");
   });
 });
 

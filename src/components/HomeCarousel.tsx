@@ -41,7 +41,6 @@ function HeroImageSlide({ image, href, eager, first }: { image: HeroImage; href:
       fetchPriority={first ? "high" : undefined}
       loading={first || eager ? "eager" : "lazy"}
       className="kb-hero-image"
-      style={{ transform: `scale(${image.zoom})`, transformOrigin: image.zoomOrigin }}
       draggable={false}
     />
   );
@@ -56,7 +55,7 @@ function HeroImageSlide({ image, href, eager, first }: { image: HeroImage; href:
 
 /**
  * The home hero: the designed images in HERO_IMAGES, one at a time in a
- * fixed 16:9 frame (560px wide at most), so the page never moves.
+ * fixed 2:1 frame (560 x 280 at most), so the page never moves.
  *
  * Every slide stays exactly 4 seconds, non-stop: nothing pauses it except a
  * hidden browser tab. It only ever moves forward — the next slide comes in

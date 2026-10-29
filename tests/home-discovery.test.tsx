@@ -105,7 +105,7 @@ describe("Marketplace — Phase A discovery (display only)", () => {
     await screen.findByRole("heading", { name: "Today's Deals Near You" }); // deals and new kitchens are loaded
     const carousel = screen.getByRole("region", { name: /Featured on/ });
     const frames = [...carousel.querySelectorAll(".kb-hero-frame")].map((f) => f.getAttribute("data-key"));
-    expect(frames).toEqual(["01-browse", "02-real-people", "03-riders", "04-simple", "05-community", "06-islandwide", "07-deepavali", "08-cny", "09-hari-raya", "10-christmas"]);
+    expect(frames).toEqual(["01-browse", "02-real-people", "03-simple", "04-riders", "05-deepavali", "06-christmas", "07-new-year", "08-cny", "09-national-day"]);
     expect(within(carousel).queryByText(/Good food,|FLASH DEAL|DEAL|NEW/)).toBeNull();
     const links = within(carousel).queryAllByRole("link", { hidden: true }).map((a) => a.getAttribute("href"));
     expect(links.every((href) => href === "#all-cooks")).toBe(true);
@@ -146,7 +146,7 @@ describe("MerchantCard deal badge", () => {
 });
 
 describe("HomeCarousel", () => {
-  const ALWAYS = ["01-browse", "02-real-people", "03-riders", "04-simple", "05-community", "06-islandwide"];
+  const ALWAYS = ["01-browse", "02-real-people", "03-simple", "04-riders"];
   /** 10:00 on 20 Nov 2026 in Singapore: no festive window open. */
   const OFF_SEASON = "2026-11-20T02:00:00Z";
   const carousel = () => screen.getByRole("region", { name: /Featured on/ });
@@ -166,7 +166,7 @@ describe("HomeCarousel", () => {
     expect(within(carousel()).queryAllByRole("button", { hidden: true })).toHaveLength(0);
     expect(carousel().querySelectorAll("[tabindex]")).toHaveLength(0);
     expect(carousel().querySelector(".kb-hero-dots")).toHaveAttribute("aria-hidden", "true");
-    expect(dots().map((d) => d.tagName)).toEqual(Array(6).fill("SPAN"));
+    expect(dots().map((d) => d.tagName)).toEqual(Array(4).fill("SPAN"));
     expect(activeDot()).toBe(0);
   });
 
@@ -181,7 +181,7 @@ describe("HomeCarousel", () => {
     tick(3_999);
     expect(current()).toBe("02-real-people");
     tick(1);
-    expect(current()).toBe("03-riders");
+    expect(current()).toBe("03-simple");
     expect(activeDot()).toBe(2);
   });
 
@@ -189,7 +189,7 @@ describe("HomeCarousel", () => {
     at(OFF_SEASON);
     render(<HomeCarousel allCooksId="all-cooks" />);
     const seen = [current()];
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < 5; i++) {
       tick(4_000);
       seen.push(current());
     }
@@ -198,7 +198,7 @@ describe("HomeCarousel", () => {
     // Mid-move the outgoing slide is leaving (to the left); once it's gone it waits on the right again.
     tick(4_000);
     const frame = (key: string) => carousel().querySelector(`[data-key="${key}"]`)!;
-    expect(frame("03-riders")).toHaveClass("is-current");
+    expect(frame("03-simple")).toHaveClass("is-current");
     expect(frame("02-real-people")).toHaveClass("is-leaving");
     tick(800);
     expect(frame("02-real-people")).toHaveClass("is-waiting");
@@ -222,7 +222,7 @@ describe("HomeCarousel", () => {
     fireEvent.keyDown(region, { key: "ArrowRight" });
     fireEvent.pointerUp(region, { pointerType: "touch" });
     tick(4_000);
-    expect(current()).toBe("03-riders");
+    expect(current()).toBe("03-simple");
   });
 
   it("pauses only while the browser tab is hidden", () => {
@@ -245,7 +245,7 @@ describe("HomeCarousel", () => {
     try {
       render(<HomeCarousel allCooksId="all-cooks" />);
       tick(8_000);
-      expect(current()).toBe("03-riders");
+      expect(current()).toBe("03-simple");
     } finally {
       window.matchMedia = original;
     }
@@ -254,27 +254,27 @@ describe("HomeCarousel", () => {
   });
 
   it("brings a festive slide in at the first slide change after its window opens (Singapore midnight)", () => {
-    at("2026-11-30T15:59:40Z"); // 23:59:40 on 30 Nov in Singapore
+    at("2026-11-30T15:59:48Z"); // 23:59:48 on 30 Nov in Singapore
     render(<HomeCarousel allCooksId="all-cooks" />);
-    expect(dots()).toHaveLength(6);
-    tick(20_000); // 06 comes in at 00:00:00 on 1 Dec
-    expect(current()).toBe("06-islandwide");
+    expect(dots()).toHaveLength(4);
+    tick(12_000); // 04 comes in at 00:00:00 on 1 Dec
+    expect(current()).toBe("04-riders");
     tick(4_000);
-    expect(current()).toBe("10-christmas");
-    expect(dots()).toHaveLength(7);
+    expect(current()).toBe("06-christmas");
+    expect(dots()).toHaveLength(5);
     tick(4_000);
     expect(current()).toBe("01-browse");
   });
 
   it("drops a festive slide at the first slide change after its window closes, without going back", () => {
-    at("2026-11-09T15:59:40Z"); // 23:59:40 on 9 Nov in Singapore, the last Deepavali day
+    at("2026-11-09T15:59:48Z"); // 23:59:48 on 9 Nov in Singapore, the last Deepavali day
     render(<HomeCarousel allCooksId="all-cooks" />);
-    expect(dots()).toHaveLength(7);
-    tick(20_000);
-    expect(current()).toBe("06-islandwide");
+    expect(dots()).toHaveLength(5);
+    tick(12_000);
+    expect(current()).toBe("04-riders");
     tick(4_000);
-    expect(current()).toBe("01-browse"); // skips 07, now out of season
-    expect(dots()).toHaveLength(6);
+    expect(current()).toBe("01-browse"); // skips 05, now out of season
+    expect(dots()).toHaveLength(4);
   });
 
   it("links 01 and the festive slides to All Cooks & Stalls, only while that list is on the page", () => {
@@ -285,10 +285,11 @@ describe("HomeCarousel", () => {
       .map((a) => [a.closest(".kb-hero-frame")!.getAttribute("data-key"), a.getAttribute("href")]);
     expect(linked).toEqual([
       ["01-browse", "#all-cooks"],
-      ["07-deepavali", "#all-cooks"],
+      ["05-deepavali", "#all-cooks"],
+      ["06-christmas", "#all-cooks"],
+      ["07-new-year", "#all-cooks"],
       ["08-cny", "#all-cooks"],
-      ["09-hari-raya", "#all-cooks"],
-      ["10-christmas", "#all-cooks"],
+      ["09-national-day", "#all-cooks"],
     ]);
     expect(within(carousel()).getByRole("img", { hidden: true, name: /Delivering goodness together/ }).closest("a")).toBeNull();
     rerender(<HomeCarousel allCooksId={null} />);
@@ -299,28 +300,28 @@ describe("HomeCarousel", () => {
     at(OFF_SEASON);
     render(<HomeCarousel allCooksId="all-cooks" />);
     const imgs = [...carousel().querySelectorAll("img")];
-    expect(imgs).toHaveLength(10);
+    expect(imgs).toHaveLength(9);
     for (const img of imgs) expect(img.getAttribute("alt")!.length).toBeGreaterThan(40);
-    expect(imgs.map((i) => i.getAttribute("loading"))).toEqual(["eager", "eager", ...Array(8).fill("lazy")]);
+    expect(imgs.map((i) => i.getAttribute("loading"))).toEqual(["eager", "eager", ...Array(7).fill("lazy")]);
     expect(imgs[0]).toHaveAttribute("fetchpriority", "high");
     tick(4_000);
     expect([...carousel().querySelectorAll("img")].map((i) => i.getAttribute("loading")).slice(0, 4)).toEqual(["eager", "eager", "eager", "lazy"]);
   });
 
-  it("trims each image's screenshot edges with its own zoom", () => {
+  it("shows every image whole: no zoom or other transform on any picture", () => {
     at(OFF_SEASON);
     render(<HomeCarousel allCooksId="all-cooks" />);
-    const community = carousel().querySelector('[data-key="05-community"] img') as HTMLImageElement;
-    expect(community.style.transform).toBe("scale(1.105)");
-    expect(community.style.transformOrigin).toBe("85% 35%");
-    expect(community.className).toBe("kb-hero-image");
+    for (const img of carousel().querySelectorAll("img")) {
+      expect(img.style.transform).toBe("");
+      expect(img.className).toBe("kb-hero-image");
+    }
   });
 
-  it("sits in a fixed 16:9 frame, 560px wide at most, with the dots in their own row", () => {
+  it("sits in a fixed 2:1 frame, 560 x 280 at most and centred, with the dots in their own row", () => {
     const css = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
     expect(css).toMatch(/\.kb-hero-carousel \{[^}]*max-width:560px[^}]*margin:8px auto 0/);
-    expect(css).toMatch(/\.kb-hero-viewport \{[^}]*aspect-ratio:16\/9[^}]*overflow:hidden/);
-    expect(css).toMatch(/\.kb-hero-image \{ object-fit:cover; object-position:left center; \}/);
+    expect(css).toMatch(/\.kb-hero-viewport \{[^}]*aspect-ratio:2\/1[^}]*overflow:hidden/);
+    expect(css).toMatch(/\.kb-hero-image \{ object-fit:cover; object-position:center; \}/);
     expect(css).toMatch(/\.kb-hero-dots \{ display:flex; height:6px;/);
   });
 });
