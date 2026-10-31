@@ -43,7 +43,8 @@ vi.mock("@/lib/supabase/server", () => ({
     from(table: string) {
       const result = () => {
         if (table === "orders") return { data: db.order };
-        if (table === "kitchens") return { data: { business_name: "Aunty May", paynow_type: null, paynow_value: null } };
+        // latitude/longitude here stand in for a leak: they must never reach the map.
+        if (table === "kitchens") return { data: { business_name: "Aunty May", paynow_type: null, paynow_value: null, latitude: 1.4444, longitude: 103.7777 } };
         if (table === "messages") return { data: db.proof };
         if (table === "ratings") return db.rating;
         if (table === "order_items") return { data: [{ id: "i1", name: "Kopi", price: 2, quantity: 1 }] };
@@ -63,8 +64,13 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 vi.mock("@/components/OrderRealtimeRefresher", () => ({ OrderRealtimeRefresher: () => null }));
 vi.mock("@/components/RiderLocationMap", () => ({
-  RiderLocationMap: ({ deliveryRequestId }: { deliveryRequestId: string }) => (
-    <div data-testid="rider-location-map" data-delivery-request-id={deliveryRequestId} />
+  RiderLocationMap: (props: { deliveryRequestId: string; dropoff?: [number, number] | null }) => (
+    <div
+      data-testid="rider-location-map"
+      data-delivery-request-id={props.deliveryRequestId}
+      data-dropoff={props.dropoff ? props.dropoff.join(",") : "none"}
+      data-props={JSON.stringify(props)}
+    />
   ),
 }));
 vi.mock("@/components/CancelOrderButton", () => ({ CancelOrderButton: () => null }));
@@ -143,6 +149,45 @@ describe("/orders/[id] — rider card", () => {
     expect(within(container).getByText("Rider has collected your food and is on the way to you", { selector: "p" })).toBeInTheDocument();
     expect(within(container).getByTestId("rider-card")).toBeInTheDocument();
     expect(within(container).getByTestId("rider-location-map")).toHaveAttribute("data-delivery-request-id", "dr-1");
+  });
+
+  const PICKED_UP: DeliveryRequestRow = { ...accepted, picked_up_at: "2026-01-01T00:32:00.000Z" };
+  const AT_HOME = { customer_lat: "1.352100", customer_lng: "103.819800" };
+
+  it("passes no drop-off to the map before pickup, even with saved coordinates", async () => {
+    db.activeDeliveryId = "dr-1";
+    const { container } = await renderPage(order(AT_HOME), [accepted]);
+    expect(within(container).getByTestId("rider-location-map")).toHaveAttribute("data-dropoff", "none");
+  });
+
+  it("passes the customer's drop-off to the map after pickup", async () => {
+    db.activeDeliveryId = "dr-1";
+    const { container } = await renderPage(order(AT_HOME), [PICKED_UP]);
+    expect(within(container).getByTestId("rider-location-map")).toHaveAttribute("data-dropoff", "1.3521,103.8198");
+  });
+
+  it("passes no drop-off after pickup on an older order without coordinates", async () => {
+    db.activeDeliveryId = "dr-1";
+    const { container } = await renderPage(order({ customer_lat: null, customer_lng: null }), [PICKED_UP]);
+    expect(within(container).getByTestId("rider-location-map")).toHaveAttribute("data-dropoff", "none");
+  });
+
+  it("never passes kitchen coordinates to the map", async () => {
+    db.activeDeliveryId = "dr-1";
+    const { container } = await renderPage(order(AT_HOME), [PICKED_UP]);
+    const raw = within(container).getByTestId("rider-location-map").getAttribute("data-props")!;
+    expect(Object.keys(JSON.parse(raw)).sort()).toEqual(["deliveryRequestId", "dropoff"]);
+    expect(raw).not.toContain("1.4444");
+    expect(raw).not.toContain("103.7777");
+  });
+
+  it("shows no map (so no line) once delivered or cancelled", async () => {
+    db.activeDeliveryId = "dr-1";
+    const delivered = await renderPage(order(AT_HOME), [{ ...completed, picked_up_at: "2026-01-01T00:32:00.000Z" }]);
+    expect(within(delivered.container).queryByTestId("rider-location-map")).toBeNull();
+    cleanup();
+    const cancelled = await renderPage(order({ ...AT_HOME, order_status: "cancelled" }), [PICKED_UP]);
+    expect(within(cancelled.container).queryByTestId("rider-location-map")).toBeNull();
   });
 
   it("shows no live map when get_order_active_delivery returns null", async () => {

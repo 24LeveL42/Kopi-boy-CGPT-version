@@ -8,6 +8,7 @@ import { RiderCard, type RiderInfo } from "@/components/RiderCard";
 import { OrderChat } from "@/components/OrderChat";
 import { ProofOfDeliveryCard } from "@/components/ProofOfDeliveryCard";
 import { RiderLocationMap } from "@/components/RiderLocationMap";
+import { pickLineTarget } from "@/lib/rider-line";
 import { ORDER_CHAT_PHOTO_BUCKET, ORDER_CHAT_PHOTO_URL_TTL_SECONDS, type MessageRow } from "@/lib/messages";
 import { SupportChatToggle } from "@/components/SupportChat";
 import { OrderRating, RateOrder } from "@/components/RateOrder";
@@ -38,6 +39,9 @@ export interface OrderRow {
   delivery_fee_estimate?: number | null;
   /** Postal-code delivery quote (src/lib/delivery-quote.ts); null on orders placed before it. */
   customer_postal_code?: string | null;
+  /** The customer's drop-off point, captured at checkout; null on older orders. Postgres numeric may arrive as a string. */
+  customer_lat?: number | string | null;
+  customer_lng?: number | string | null;
   delivery_type?: string | null;
   delivery_distance_km?: number | null;
   /** Address snapshot taken at checkout (docs/supabase-customer-addresses.sql); absent/null on older orders. */
@@ -354,6 +358,11 @@ export default async function OrderConfirmationPage({
     const { data } = await supabase.rpc("get_order_active_delivery", { p_order_id: id });
     liveDeliveryRequestId = typeof data === "string" ? data : null;
   }
+  // The map's dashed line: only after pickup, only to the customer's own
+  // drop-off. No kitchen coordinates are ever passed to the map.
+  const liveDropoff = liveDeliveryRequestId
+    ? pickLineTarget(Boolean(activeDelivery?.picked_up_at), { lat: order.customer_lat, lng: order.customer_lng })
+    : null;
 
   // Proof-of-delivery photo, once delivered. The chat is closed by then; RLS
   // still lets the customer read just this message and sign its photo (Partner
@@ -474,7 +483,7 @@ export default async function OrderConfirmationPage({
           {/* After the first order, never on a first visit: this page only exists once one is placed. */}
           {user && !header.failed && <PushPrompt />}
           {rider && <RiderCard rider={rider} />}
-          {liveDeliveryRequestId && <RiderLocationMap deliveryRequestId={liveDeliveryRequestId} />}
+          {liveDeliveryRequestId && <RiderLocationMap deliveryRequestId={liveDeliveryRequestId} dropoff={liveDropoff} />}
           {proofPhotoUrl && (
             <ProofOfDeliveryCard photoUrl={proofPhotoUrl} deliveredAt={formatTimestamp(activeDelivery?.completed_at ?? null)} />
           )}
