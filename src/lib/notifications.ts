@@ -9,6 +9,8 @@
  * thing it's about and `url` is where a tap goes — there is no `order_id`.
  */
 
+import { safeRedirectPath } from "@/lib/safe-redirect";
+
 export type NotificationType =
   | "order_placed"
   | "order_accepted"
@@ -61,12 +63,12 @@ export function countUnread(notifications: NotificationRow[]): number {
 
 /**
  * Where tapping a notification goes: its `url`, or nowhere for the "/"
- * default that order-less ones carry. Only same-site paths are followed.
+ * default that order-less ones carry. Only same-site paths are followed
+ * (safeRedirectPath: the url is stored data, not typed by this user).
  */
 export function notificationHref(n: Pick<NotificationRow, "url">): string | null {
-  const url = n.url;
-  if (!url || url === "/" || !url.startsWith("/") || url.startsWith("//")) return null;
-  return url;
+  const url = safeRedirectPath(n.url, "");
+  return url === "" || url === "/" ? null : url;
 }
 
 /** "Just now" / "5 min ago" / "3 h ago" / "2 d ago" / "5 Sep". */
