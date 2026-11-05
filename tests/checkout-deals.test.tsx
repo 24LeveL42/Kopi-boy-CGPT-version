@@ -38,6 +38,14 @@ async function goToCheckout() {
 }
 
 const confirmButton = () => screen.getByRole("button", { name: /Confirm Order/ });
+/**
+ * The error shows a moment before the order attempt finishes, while the button still
+ * reads "Confirming order…", so wait for Confirm Order to be back and enabled.
+ */
+const readyConfirmButton = async () => {
+  await waitFor(() => expect(confirmButton()).toBeEnabled());
+  return confirmButton();
+};
 const requestIds = () => vi.mocked(placeOrder).mock.calls.map((c) => c[3]?.requestId);
 
 beforeEach(() => {
@@ -144,12 +152,13 @@ describe("Checkout — request id", () => {
 
     fireEvent.click(confirmButton());
     expect(await screen.findByText("Something went wrong — please try again.")).toBeInTheDocument();
-    fireEvent.click(confirmButton());
+    fireEvent.click(await readyConfirmButton());
     expect(await screen.findByText("This kitchen isn't accepting orders right now.")).toBeInTheDocument();
 
+    await readyConfirmButton();
     fireEvent.click(screen.getByRole("button", { name: /Express/ }));
     await waitFor(() => expect(confirmButton()).toHaveTextContent("$6.50"));
-    fireEvent.click(confirmButton());
+    fireEvent.click(await readyConfirmButton());
     await waitFor(() => expect(push).toHaveBeenCalledWith("/orders/order-9"));
 
     const [a, b, c] = requestIds();
