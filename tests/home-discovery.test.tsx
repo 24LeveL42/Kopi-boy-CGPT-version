@@ -326,7 +326,7 @@ describe("HomeCarousel", () => {
     const css = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
     expect(css).toMatch(/\.kb-hero-carousel \{[^}]*max-width:560px[^}]*margin:8px auto 0/);
     expect(css).toMatch(/\.kb-hero-viewport \{[^}]*aspect-ratio:2\/1[^}]*overflow:hidden/);
-    expect(css).toMatch(/\.kb-hero-image \{ object-fit:contain; object-position:center; \}/); // whole picture, never trimmed
+    expect(css).toMatch(/\.kb-hero-image \{ object-fit:cover; object-position:center; \}/);
     expect(css).toMatch(/\.kb-hero-dots \{ display:flex; height:6px;/);
   });
 });

@@ -46,9 +46,9 @@ export const BRAND_IMAGE_SLIDES: readonly BrandImageSlide[] = [
  * (the brand card and the deal / new-kitchen slides above are kept but no
  * longer rendered). Played in this order, each for HERO_SLIDE_MS. Logo and
  * headline are drawn into every image, so the alt text repeats the wording.
- * Each is shown whole in the 2:1 frame: no zoom, nothing cropped. 01 and
- * 05-09 are exactly 2:1; 10-12 were supplied at 1768 x 890, so they show
- * with a hairline (about 2 px) at each side instead of being trimmed.
+ * Each fills the 2:1 frame with no zoom. 01 and 05-09 are exactly 2:1, so
+ * nothing is cut; 10-12 were supplied at 1768 x 890, so about 1 px is
+ * trimmed top and bottom on screen (accepted by the owner: only background).
  * 10-12 have buttons drawn on them but are deliberately not links: those
  * features (today's specials, food requests, tomorrow's menu) don't exist yet.
  * A seasonal image has a `window` of Singapore dates, both days included;

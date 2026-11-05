@@ -284,8 +284,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .kb-hero-frame { position:absolute; inset:0; transform:translateX(100%); visibility:hidden; transition:none; }
 .kb-hero-frame.is-current { z-index:2; transform:translateX(0); visibility:visible; transition:transform .6s ease; }
 .kb-hero-frame.is-leaving { z-index:1; transform:translateX(-100%); visibility:visible; transition:transform .6s ease; }
-/* Shown whole, never trimmed: the 2:1 images fill the frame exactly; 10-12 (1768 x 890) leave a hairline at each side. */
-.kb-hero-image { object-fit:contain; object-position:center; }
+/* Fills the 2:1 frame. 01 and 05-09 are exactly 2:1; 10-12 (1768 x 890) lose about 1 px top and bottom, clear of any text, logo or mascot. */
+.kb-hero-image { object-fit:cover; object-position:center; }
 .kb-hero-slide { position:absolute; inset:0; display:block; overflow:hidden; border-radius:24px; background:linear-gradient(135deg,#6523df 0%,#8b45ee 54%,#11b88a 120%); color:#fff; -webkit-user-drag:none; }
 .kb-hero-slide-photo { object-fit:cover; filter:saturate(1.08) contrast(1.02); }
 .kb-hero-slide-overlay { position:absolute; inset:0; z-index:1; background:linear-gradient(90deg,rgba(51,20,100,.93) 0%,rgba(80,30,130,.74) 50%,rgba(17,184,138,.3) 100%),linear-gradient(0deg,rgba(0,0,0,.42),transparent 60%); }
