@@ -46,8 +46,11 @@ export const BRAND_IMAGE_SLIDES: readonly BrandImageSlide[] = [
  * (the brand card and the deal / new-kitchen slides above are kept but no
  * longer rendered). Played in this order, each for HERO_SLIDE_MS. Logo and
  * headline are drawn into every image, so the alt text repeats the wording.
- * Every file is 2:1, the same shape as the hero frame, so each is shown
- * whole: no zoom, nothing cropped.
+ * Each is shown whole in the 2:1 frame: no zoom, nothing cropped. 01 and
+ * 05-09 are exactly 2:1; 10-12 were supplied at 1768 x 890, so they show
+ * with a hairline (about 2 px) at each side instead of being trimmed.
+ * 10-12 have buttons drawn on them but are deliberately not links: those
+ * features (today's specials, food requests, tomorrow's menu) don't exist yet.
  * A seasonal image has a `window` of Singapore dates, both days included;
  * outside it the image is skipped.
  */
@@ -61,9 +64,9 @@ export interface HeroImage {
 
 export const HERO_IMAGES: readonly HeroImage[] = [
   { key: "01-browse", src: "/hero/01-browse.webp", alt: "Something good is cooking nearby. Order straight from the people who make it: home cooks, hawkers, bakers and small businesses. Browse all cooks and stalls.", linksToAllCooks: true },
-  { key: "02-real-people", src: "/hero/02-real-people.webp", alt: "Real people. Real food. Support home cooks, hawkers, bakeries and small businesses in your area.", linksToAllCooks: false },
-  { key: "03-simple", src: "/hero/03-simple.webp", alt: "Your favourite food, made simple. Discover, order, track, enjoy: find food near you, easy ordering, live tracking and order updates.", linksToAllCooks: false },
-  { key: "04-riders", src: "/hero/04-riders.webp", alt: "Delivering goodness together. Riders keep your favourite food moving across the island: fair rates, flexible time, no commission, be part of the community.", linksToAllCooks: false },
+  { key: "10-whats-cooking", src: "/hero/10-whats-cooking.webp", alt: "What's cooking today? Discover today's mystery specials from our home cooks and hawkers. Explore today's specials.", linksToAllCooks: false },
+  { key: "11-request-food", src: "/hero/11-request-food.webp", alt: "Request your favourite food! Craving something special? Tell us what you want and let our home cooks and hawkers make it happen. Request now.", linksToAllCooks: false },
+  { key: "12-tomorrows-menu", src: "/hero/12-tomorrows-menu.webp", alt: "Tomorrow's menu: pre-order today! See what our home cooks and hawkers will prepare tomorrow and reserve your portion now. Pre-order now.", linksToAllCooks: false },
   { key: "05-deepavali", src: "/hero/05-deepavali.webp", alt: "Deepavali special deals. Celebrate the Festival of Lights with delicious local food from home cooks, hawkers and small businesses.", linksToAllCooks: true, window: { from: "2026-10-28", to: "2026-11-09" } },
   { key: "06-christmas", src: "/hero/06-christmas.webp", alt: "Christmas special deals. Enjoy delicious local food from home cooks, hawkers and small businesses.", linksToAllCooks: true, window: { from: "2026-12-01", to: "2026-12-26" } },
   { key: "07-new-year", src: "/hero/07-new-year.webp", alt: "New Year special deals for 2027. Start the new year with delicious local food from home cooks, hawkers and small businesses.", linksToAllCooks: true, window: { from: "2026-12-27", to: "2027-01-03" } },

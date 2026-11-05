@@ -105,7 +105,7 @@ describe("Marketplace — Phase A discovery (display only)", () => {
     await screen.findByRole("heading", { name: "Today's Deals Near You" }); // deals and new kitchens are loaded
     const carousel = screen.getByRole("region", { name: /Featured on/ });
     const frames = [...carousel.querySelectorAll(".kb-hero-frame")].map((f) => f.getAttribute("data-key"));
-    expect(frames).toEqual(["01-browse", "02-real-people", "03-simple", "04-riders", "05-deepavali", "06-christmas", "07-new-year", "08-cny", "09-national-day"]);
+    expect(frames).toEqual(["01-browse", "10-whats-cooking", "11-request-food", "12-tomorrows-menu", "05-deepavali", "06-christmas", "07-new-year", "08-cny", "09-national-day"]);
     expect(within(carousel).queryByText(/Good food,|FLASH DEAL|DEAL|NEW/)).toBeNull();
     const links = within(carousel).queryAllByRole("link", { hidden: true }).map((a) => a.getAttribute("href"));
     expect(links.every((href) => href === "#all-cooks")).toBe(true);
@@ -146,7 +146,7 @@ describe("MerchantCard deal badge", () => {
 });
 
 describe("HomeCarousel", () => {
-  const ALWAYS = ["01-browse", "02-real-people", "03-simple", "04-riders"];
+  const ALWAYS = ["01-browse", "10-whats-cooking", "11-request-food", "12-tomorrows-menu"];
   /** 10:00 on 20 Nov 2026 in Singapore: no festive window open. */
   const OFF_SEASON = "2026-11-20T02:00:00Z";
   const carousel = () => screen.getByRole("region", { name: /Featured on/ });
@@ -177,11 +177,11 @@ describe("HomeCarousel", () => {
     tick(3_999);
     expect(current()).toBe("01-browse");
     tick(1);
-    expect(current()).toBe("02-real-people");
+    expect(current()).toBe("10-whats-cooking");
     tick(3_999);
-    expect(current()).toBe("02-real-people");
+    expect(current()).toBe("10-whats-cooking");
     tick(1);
-    expect(current()).toBe("03-simple");
+    expect(current()).toBe("11-request-food");
     expect(activeDot()).toBe(2);
   });
 
@@ -193,15 +193,15 @@ describe("HomeCarousel", () => {
       tick(4_000);
       seen.push(current());
     }
-    expect(seen).toEqual([...ALWAYS, "01-browse", "02-real-people"]);
+    expect(seen).toEqual([...ALWAYS, "01-browse", "10-whats-cooking"]);
 
     // Mid-move the outgoing slide is leaving (to the left); once it's gone it waits on the right again.
     tick(4_000);
     const frame = (key: string) => carousel().querySelector(`[data-key="${key}"]`)!;
-    expect(frame("03-simple")).toHaveClass("is-current");
-    expect(frame("02-real-people")).toHaveClass("is-leaving");
+    expect(frame("11-request-food")).toHaveClass("is-current");
+    expect(frame("10-whats-cooking")).toHaveClass("is-leaving");
     tick(800);
-    expect(frame("02-real-people")).toHaveClass("is-waiting");
+    expect(frame("10-whats-cooking")).toHaveClass("is-waiting");
     expect(carousel().querySelectorAll(".is-leaving")).toHaveLength(0);
   });
 
@@ -217,12 +217,12 @@ describe("HomeCarousel", () => {
     fireEvent.focus(region.querySelector("a")!);
     expect(current()).toBe("01-browse");
     tick(2_000);
-    expect(current()).toBe("02-real-people");
+    expect(current()).toBe("10-whats-cooking");
     fireEvent.keyDown(region, { key: "ArrowLeft" });
     fireEvent.keyDown(region, { key: "ArrowRight" });
     fireEvent.pointerUp(region, { pointerType: "touch" });
     tick(4_000);
-    expect(current()).toBe("03-simple");
+    expect(current()).toBe("11-request-food");
   });
 
   it("pauses only while the browser tab is hidden", () => {
@@ -235,7 +235,7 @@ describe("HomeCarousel", () => {
     Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "visible" });
     act(() => void document.dispatchEvent(new Event("visibilitychange")));
     tick(4_000);
-    expect(current()).toBe("02-real-people");
+    expect(current()).toBe("10-whats-cooking");
   });
 
   it("keeps the same 4-second beat with prefers-reduced-motion (the CSS makes it a cut)", () => {
@@ -245,7 +245,7 @@ describe("HomeCarousel", () => {
     try {
       render(<HomeCarousel allCooksId="all-cooks" />);
       tick(8_000);
-      expect(current()).toBe("03-simple");
+      expect(current()).toBe("11-request-food");
     } finally {
       window.matchMedia = original;
     }
@@ -257,8 +257,8 @@ describe("HomeCarousel", () => {
     at("2026-11-30T15:59:48Z"); // 23:59:48 on 30 Nov in Singapore
     render(<HomeCarousel allCooksId="all-cooks" />);
     expect(dots()).toHaveLength(4);
-    tick(12_000); // 04 comes in at 00:00:00 on 1 Dec
-    expect(current()).toBe("04-riders");
+    tick(12_000); // 12 comes in at 00:00:00 on 1 Dec
+    expect(current()).toBe("12-tomorrows-menu");
     tick(4_000);
     expect(current()).toBe("06-christmas");
     expect(dots()).toHaveLength(5);
@@ -271,7 +271,7 @@ describe("HomeCarousel", () => {
     render(<HomeCarousel allCooksId="all-cooks" />);
     expect(dots()).toHaveLength(5);
     tick(12_000);
-    expect(current()).toBe("04-riders");
+    expect(current()).toBe("12-tomorrows-menu");
     tick(4_000);
     expect(current()).toBe("01-browse"); // skips 05, now out of season
     expect(dots()).toHaveLength(4);
@@ -291,7 +291,12 @@ describe("HomeCarousel", () => {
       ["08-cny", "#all-cooks"],
       ["09-national-day", "#all-cooks"],
     ]);
-    expect(within(carousel()).getByRole("img", { hidden: true, name: /Delivering goodness together/ }).closest("a")).toBeNull();
+    // 10-12 have buttons drawn on them, but those features don't exist yet: not links, nothing to press.
+    for (const key of ["10-whats-cooking", "11-request-food", "12-tomorrows-menu"]) {
+      const frame = carousel().querySelector(`[data-key="${key}"]`)!;
+      expect(frame.querySelector("a, button, [href], [role=link], [onclick]")).toBeNull();
+      expect(frame.querySelector(".kb-hero-slide")!.tagName).toBe("DIV");
+    }
     rerender(<HomeCarousel allCooksId={null} />);
     expect(within(carousel()).queryAllByRole("link", { hidden: true })).toHaveLength(0);
   });
@@ -321,7 +326,7 @@ describe("HomeCarousel", () => {
     const css = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
     expect(css).toMatch(/\.kb-hero-carousel \{[^}]*max-width:560px[^}]*margin:8px auto 0/);
     expect(css).toMatch(/\.kb-hero-viewport \{[^}]*aspect-ratio:2\/1[^}]*overflow:hidden/);
-    expect(css).toMatch(/\.kb-hero-image \{ object-fit:cover; object-position:center; \}/);
+    expect(css).toMatch(/\.kb-hero-image \{ object-fit:contain; object-position:center; \}/); // whole picture, never trimmed
     expect(css).toMatch(/\.kb-hero-dots \{ display:flex; height:6px;/);
   });
 });

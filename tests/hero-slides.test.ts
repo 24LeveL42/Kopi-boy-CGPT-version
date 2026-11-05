@@ -111,7 +111,9 @@ describe("BRAND_IMAGE_SLIDES", () => {
 /** Midnight at the start of a Singapore day, as a UTC timestamp (Singapore is UTC+8 all year). */
 const sgMidnight = (day: string) => Date.parse(`${day}T00:00:00+08:00`);
 const keys = (list: { key: string }[]) => list.map((i) => i.key);
-const ALWAYS = ["01-browse", "02-real-people", "03-simple", "04-riders"];
+const ALWAYS = ["01-browse", "10-whats-cooking", "11-request-food", "12-tomorrows-menu"];
+const RETIRED = ["02-real-people", "03-simple", "04-riders"];
+const NOT_LINKED = ["10-whats-cooking", "11-request-food", "12-tomorrows-menu"];
 const FESTIVE = ["05-deepavali", "06-christmas", "07-new-year", "08-cny", "09-national-day"];
 
 describe("HERO_IMAGES — the carousel's images", () => {
@@ -126,16 +128,22 @@ describe("HERO_IMAGES — the carousel's images", () => {
     }
   });
 
-  it("keeps public/hero to exactly these nine files", () => {
-    expect(readdirSync(join(process.cwd(), "public", "hero")).sort()).toEqual(HERO_IMAGES.map((i) => `${i.key}.webp`));
+  it("keeps public/hero to these images plus the retired 02-04 files, left in place unused", () => {
+    expect(readdirSync(join(process.cwd(), "public", "hero")).sort()).toEqual(
+      [...HERO_IMAGES.map((i) => i.key), ...RETIRED].map((k) => `${k}.webp`).sort(),
+    );
+    for (const key of RETIRED) expect(keys([...HERO_IMAGES])).not.toContain(key);
   });
 
-  it("includes the rider banner (04-riders), always showing and not a link", () => {
-    const riders = HERO_IMAGES[3];
-    expect(riders.key).toBe("04-riders");
-    expect(riders.window).toBeUndefined();
-    expect(riders.linksToAllCooks).toBe(false); // no rider sign-up link exists in this app
-    expect(riders.alt).toMatch(/Delivering goodness together/);
+  it("puts 10-12 where 02-04 were, always showing and never a link (those features don't exist yet)", () => {
+    expect(keys(HERO_IMAGES.slice(1, 4))).toEqual(NOT_LINKED);
+    for (const image of HERO_IMAGES.slice(1, 4)) {
+      expect(image.window).toBeUndefined();
+      expect(image.linksToAllCooks).toBe(false);
+    }
+    expect(HERO_IMAGES[1].alt).toMatch(/^What's cooking today\?/);
+    expect(HERO_IMAGES[2].alt).toMatch(/^Request your favourite food!/);
+    expect(HERO_IMAGES[3].alt).toMatch(/^Tomorrow's menu: pre-order today!/);
   });
 
   it("gives every image its wording as alt text", () => {
@@ -157,7 +165,7 @@ describe("HERO_IMAGES — the carousel's images", () => {
     }
   });
 
-  it("gives the festive images their Singapore date windows; 01-04 have none", () => {
+  it("gives the festive images their Singapore date windows; 01 and 10-12 have none", () => {
     expect(Object.fromEntries(HERO_IMAGES.filter((i) => i.window).map((i) => [i.key, i.window]))).toEqual({
       "05-deepavali": { from: "2026-10-28", to: "2026-11-09" },
       "06-christmas": { from: "2026-12-01", to: "2026-12-26" },
@@ -193,7 +201,7 @@ describe("seasonal windows — Singapore time, both days included", () => {
     });
   }
 
-  it("shows only 01-04 outside every window, and adds just the one in season", () => {
+  it("shows only 01 and 10-12 outside every window, and adds just the one in season", () => {
     expect(keys(showingHeroImages(sgMidnight("2026-11-20")))).toEqual(ALWAYS);
     expect(keys(showingHeroImages(sgMidnight("2026-12-26")))).toEqual([...ALWAYS, "06-christmas"]);
     expect(keys(showingHeroImages(sgMidnight("2026-12-27")))).toEqual([...ALWAYS, "07-new-year"]); // Christmas hands over to New Year
@@ -213,9 +221,9 @@ describe("nextHeroImage — forward only", () => {
     expect(seen).toEqual([...ALWAYS, "05-deepavali", "01-browse"]);
   });
 
-  it("skips a seasonal image outside its window, straight from 04 back to 01", () => {
-    expect(nextHeroImage("04-riders", offSeason).key).toBe("01-browse");
-    expect(nextHeroImage("04-riders", sgMidnight("2027-08-01")).key).toBe("09-national-day");
+  it("skips a seasonal image outside its window, straight from 12 back to 01", () => {
+    expect(nextHeroImage("12-tomorrows-menu", offSeason).key).toBe("01-browse");
+    expect(nextHeroImage("12-tomorrows-menu", sgMidnight("2027-08-01")).key).toBe("09-national-day");
     expect(nextHeroImage("09-national-day", sgMidnight("2027-08-01")).key).toBe("01-browse"); // never backwards
   });
 
