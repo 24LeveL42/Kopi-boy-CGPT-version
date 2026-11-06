@@ -111,13 +111,15 @@ describe("BRAND_IMAGE_SLIDES", () => {
 /** Midnight at the start of a Singapore day, as a UTC timestamp (Singapore is UTC+8 all year). */
 const sgMidnight = (day: string) => Date.parse(`${day}T00:00:00+08:00`);
 const keys = (list: { key: string }[]) => list.map((i) => i.key);
-const ALWAYS = ["01-browse", "10-whats-cooking", "11-request-food", "12-tomorrows-menu"];
+const ALWAYS = ["01-browse", "10-whats-cooking", "12-tomorrows-menu"];
+/** Out of the carousel until Request Favourite Food launches; the file stays in public/hero. */
+const PARKED = ["11-request-food"];
 const RETIRED = ["02-real-people", "03-simple", "04-riders"];
-const NOT_LINKED = ["10-whats-cooking", "11-request-food", "12-tomorrows-menu"];
+const NOT_LINKED = ["10-whats-cooking", "12-tomorrows-menu"];
 const FESTIVE = ["05-deepavali", "06-christmas", "07-new-year", "08-cny", "09-national-day"];
 
 describe("HERO_IMAGES — the carousel's images", () => {
-  it("plays the nine images in the agreed order, every file a real WebP under 300 KB in public/hero", () => {
+  it("plays the eight images in the agreed order, every file a real WebP under 300 KB in public/hero", () => {
     expect(keys([...HERO_IMAGES])).toEqual([...ALWAYS, ...FESTIVE]);
     for (const image of HERO_IMAGES) {
       expect(image.src).toBe(`/hero/${image.key}.webp`);
@@ -128,30 +130,30 @@ describe("HERO_IMAGES — the carousel's images", () => {
     }
   });
 
-  it("keeps public/hero to these images plus the retired 02-04 files, left in place unused", () => {
+  it("keeps public/hero to these images plus the retired 02-04 files and the parked 11, left in place unused", () => {
     expect(readdirSync(join(process.cwd(), "public", "hero")).sort()).toEqual(
-      [...HERO_IMAGES.map((i) => i.key), ...RETIRED].map((k) => `${k}.webp`).sort(),
+      [...HERO_IMAGES.map((i) => i.key), ...RETIRED, ...PARKED].map((k) => `${k}.webp`).sort(),
     );
-    for (const key of RETIRED) expect(keys([...HERO_IMAGES])).not.toContain(key);
+    for (const key of [...RETIRED, ...PARKED]) expect(keys([...HERO_IMAGES])).not.toContain(key);
   });
 
-  it("puts 10-12 where 02-04 were, always showing and never a link (those features don't exist yet)", () => {
-    expect(keys(HERO_IMAGES.slice(1, 4))).toEqual(NOT_LINKED);
-    for (const image of HERO_IMAGES.slice(1, 4)) {
+  it("puts 10 and 12 straight after 01, always showing and never a link (those features don't exist yet)", () => {
+    expect(keys(HERO_IMAGES.slice(1, 3))).toEqual(NOT_LINKED);
+    for (const image of HERO_IMAGES.slice(1, 3)) {
       expect(image.window).toBeUndefined();
       expect(image.linksToAllCooks).toBe(false);
     }
     expect(HERO_IMAGES[1].alt).toMatch(/^What's cooking today\?/);
-    expect(HERO_IMAGES[2].alt).toMatch(/^Request your favourite food!/);
-    expect(HERO_IMAGES[3].alt).toMatch(/^Tomorrow's menu: pre-order today!/);
+    expect(HERO_IMAGES[2].alt).toMatch(/^Tomorrow's menu: pre-order today!/);
+    for (const image of HERO_IMAGES) expect(image.alt).not.toMatch(/Request your favourite food/);
   });
 
   it("gives every image its wording as alt text", () => {
     for (const image of HERO_IMAGES) expect(image.alt.length, image.key).toBeGreaterThan(40);
     expect(HERO_IMAGES[0].alt).toMatch(/Something good is cooking nearby/);
-    expect(HERO_IMAGES[6].alt).toMatch(/^New Year special deals/);
-    expect(HERO_IMAGES[6].alt).not.toMatch(/Food Fest/);
-    expect(HERO_IMAGES[7].alt).toMatch(/Chinese New Year 2027/);
+    expect(HERO_IMAGES[5].alt).toMatch(/^New Year special deals/);
+    expect(HERO_IMAGES[5].alt).not.toMatch(/Food Fest/);
+    expect(HERO_IMAGES[6].alt).toMatch(/Chinese New Year 2027/);
   });
 
   it("links 01-browse and the five festive images, nothing else", () => {
@@ -165,7 +167,7 @@ describe("HERO_IMAGES — the carousel's images", () => {
     }
   });
 
-  it("gives the festive images their Singapore date windows; 01 and 10-12 have none", () => {
+  it("gives the festive images their Singapore date windows; 01, 10 and 12 have none", () => {
     expect(Object.fromEntries(HERO_IMAGES.filter((i) => i.window).map((i) => [i.key, i.window]))).toEqual({
       "05-deepavali": { from: "2026-10-28", to: "2026-11-09" },
       "06-christmas": { from: "2026-12-01", to: "2026-12-26" },
@@ -201,7 +203,7 @@ describe("seasonal windows — Singapore time, both days included", () => {
     });
   }
 
-  it("shows only 01 and 10-12 outside every window, and adds just the one in season", () => {
+  it("shows only 01, 10 and 12 outside every window, and adds just the one in season", () => {
     expect(keys(showingHeroImages(sgMidnight("2026-11-20")))).toEqual(ALWAYS);
     expect(keys(showingHeroImages(sgMidnight("2026-12-26")))).toEqual([...ALWAYS, "06-christmas"]);
     expect(keys(showingHeroImages(sgMidnight("2026-12-27")))).toEqual([...ALWAYS, "07-new-year"]); // Christmas hands over to New Year
@@ -217,7 +219,7 @@ describe("nextHeroImage — forward only", () => {
   it("steps forward one image at a time and wraps from the last to the first", () => {
     let key = "01-browse";
     const seen = [key];
-    for (let i = 0; i < 5; i++) seen.push((key = nextHeroImage(key, inDeepavali).key));
+    for (let i = 0; i < 4; i++) seen.push((key = nextHeroImage(key, inDeepavali).key));
     expect(seen).toEqual([...ALWAYS, "05-deepavali", "01-browse"]);
   });
 

@@ -105,7 +105,7 @@ describe("Marketplace — Phase A discovery (display only)", () => {
     await screen.findByRole("heading", { name: "Today's Deals Near You" }); // deals and new kitchens are loaded
     const carousel = screen.getByRole("region", { name: /Featured on/ });
     const frames = [...carousel.querySelectorAll(".kb-hero-frame")].map((f) => f.getAttribute("data-key"));
-    expect(frames).toEqual(["01-browse", "10-whats-cooking", "11-request-food", "12-tomorrows-menu", "05-deepavali", "06-christmas", "07-new-year", "08-cny", "09-national-day"]);
+    expect(frames).toEqual(["01-browse", "10-whats-cooking", "12-tomorrows-menu", "05-deepavali", "06-christmas", "07-new-year", "08-cny", "09-national-day"]);
     expect(within(carousel).queryByText(/Good food,|FLASH DEAL|DEAL|NEW/)).toBeNull();
     const links = within(carousel).queryAllByRole("link", { hidden: true }).map((a) => a.getAttribute("href"));
     expect(links.every((href) => href === "#all-cooks")).toBe(true);
@@ -146,7 +146,7 @@ describe("MerchantCard deal badge", () => {
 });
 
 describe("HomeCarousel", () => {
-  const ALWAYS = ["01-browse", "10-whats-cooking", "11-request-food", "12-tomorrows-menu"];
+  const ALWAYS = ["01-browse", "10-whats-cooking", "12-tomorrows-menu"];
   /** 10:00 on 20 Nov 2026 in Singapore: no festive window open. */
   const OFF_SEASON = "2026-11-20T02:00:00Z";
   const carousel = () => screen.getByRole("region", { name: /Featured on/ });
@@ -166,7 +166,7 @@ describe("HomeCarousel", () => {
     expect(within(carousel()).queryAllByRole("button", { hidden: true })).toHaveLength(0);
     expect(carousel().querySelectorAll("[tabindex]")).toHaveLength(0);
     expect(carousel().querySelector(".kb-hero-dots")).toHaveAttribute("aria-hidden", "true");
-    expect(dots().map((d) => d.tagName)).toEqual(Array(4).fill("SPAN"));
+    expect(dots().map((d) => d.tagName)).toEqual(Array(3).fill("SPAN"));
     expect(activeDot()).toBe(0);
   });
 
@@ -181,7 +181,7 @@ describe("HomeCarousel", () => {
     tick(3_999);
     expect(current()).toBe("10-whats-cooking");
     tick(1);
-    expect(current()).toBe("11-request-food");
+    expect(current()).toBe("12-tomorrows-menu");
     expect(activeDot()).toBe(2);
   });
 
@@ -193,15 +193,15 @@ describe("HomeCarousel", () => {
       tick(4_000);
       seen.push(current());
     }
-    expect(seen).toEqual([...ALWAYS, "01-browse", "10-whats-cooking"]);
+    expect(seen).toEqual([...ALWAYS, ...ALWAYS]);
 
     // Mid-move the outgoing slide is leaving (to the left); once it's gone it waits on the right again.
     tick(4_000);
     const frame = (key: string) => carousel().querySelector(`[data-key="${key}"]`)!;
-    expect(frame("11-request-food")).toHaveClass("is-current");
-    expect(frame("10-whats-cooking")).toHaveClass("is-leaving");
+    expect(frame("01-browse")).toHaveClass("is-current");
+    expect(frame("12-tomorrows-menu")).toHaveClass("is-leaving");
     tick(800);
-    expect(frame("10-whats-cooking")).toHaveClass("is-waiting");
+    expect(frame("12-tomorrows-menu")).toHaveClass("is-waiting");
     expect(carousel().querySelectorAll(".is-leaving")).toHaveLength(0);
   });
 
@@ -222,7 +222,7 @@ describe("HomeCarousel", () => {
     fireEvent.keyDown(region, { key: "ArrowRight" });
     fireEvent.pointerUp(region, { pointerType: "touch" });
     tick(4_000);
-    expect(current()).toBe("11-request-food");
+    expect(current()).toBe("12-tomorrows-menu");
   });
 
   it("pauses only while the browser tab is hidden", () => {
@@ -245,7 +245,7 @@ describe("HomeCarousel", () => {
     try {
       render(<HomeCarousel allCooksId="all-cooks" />);
       tick(8_000);
-      expect(current()).toBe("11-request-food");
+      expect(current()).toBe("12-tomorrows-menu");
     } finally {
       window.matchMedia = original;
     }
@@ -254,27 +254,27 @@ describe("HomeCarousel", () => {
   });
 
   it("brings a festive slide in at the first slide change after its window opens (Singapore midnight)", () => {
-    at("2026-11-30T15:59:48Z"); // 23:59:48 on 30 Nov in Singapore
+    at("2026-11-30T15:59:52Z"); // 23:59:52 on 30 Nov in Singapore
     render(<HomeCarousel allCooksId="all-cooks" />);
-    expect(dots()).toHaveLength(4);
-    tick(12_000); // 12 comes in at 00:00:00 on 1 Dec
+    expect(dots()).toHaveLength(3);
+    tick(8_000); // 12 comes in at 00:00:00 on 1 Dec
     expect(current()).toBe("12-tomorrows-menu");
     tick(4_000);
     expect(current()).toBe("06-christmas");
-    expect(dots()).toHaveLength(5);
+    expect(dots()).toHaveLength(4);
     tick(4_000);
     expect(current()).toBe("01-browse");
   });
 
   it("drops a festive slide at the first slide change after its window closes, without going back", () => {
-    at("2026-11-09T15:59:48Z"); // 23:59:48 on 9 Nov in Singapore, the last Deepavali day
+    at("2026-11-09T15:59:52Z"); // 23:59:52 on 9 Nov in Singapore, the last Deepavali day
     render(<HomeCarousel allCooksId="all-cooks" />);
-    expect(dots()).toHaveLength(5);
-    tick(12_000);
+    expect(dots()).toHaveLength(4);
+    tick(8_000); // 12 comes in at 00:00:00 on 10 Nov
     expect(current()).toBe("12-tomorrows-menu");
     tick(4_000);
     expect(current()).toBe("01-browse"); // skips 05, now out of season
-    expect(dots()).toHaveLength(4);
+    expect(dots()).toHaveLength(3);
   });
 
   it("links 01 and the festive slides to All Cooks & Stalls, only while that list is on the page", () => {
@@ -291,8 +291,9 @@ describe("HomeCarousel", () => {
       ["08-cny", "#all-cooks"],
       ["09-national-day", "#all-cooks"],
     ]);
-    // 10-12 have buttons drawn on them, but those features don't exist yet: not links, nothing to press.
-    for (const key of ["10-whats-cooking", "11-request-food", "12-tomorrows-menu"]) {
+    // 10 and 12 have buttons drawn on them, but those features don't exist yet: not links, nothing to press.
+    expect(carousel().querySelector('[data-key="11-request-food"]')).toBeNull(); // parked until Request Favourite Food launches
+    for (const key of ["10-whats-cooking", "12-tomorrows-menu"]) {
       const frame = carousel().querySelector(`[data-key="${key}"]`)!;
       expect(frame.querySelector("a, button, [href], [role=link], [onclick]")).toBeNull();
       expect(frame.querySelector(".kb-hero-slide")!.tagName).toBe("DIV");
@@ -305,9 +306,9 @@ describe("HomeCarousel", () => {
     at(OFF_SEASON);
     render(<HomeCarousel allCooksId="all-cooks" />);
     const imgs = [...carousel().querySelectorAll("img")];
-    expect(imgs).toHaveLength(9);
+    expect(imgs).toHaveLength(8);
     for (const img of imgs) expect(img.getAttribute("alt")!.length).toBeGreaterThan(40);
-    expect(imgs.map((i) => i.getAttribute("loading"))).toEqual(["eager", "eager", ...Array(7).fill("lazy")]);
+    expect(imgs.map((i) => i.getAttribute("loading"))).toEqual(["eager", "eager", ...Array(6).fill("lazy")]);
     expect(imgs[0]).toHaveAttribute("fetchpriority", "high");
     tick(4_000);
     expect([...carousel().querySelectorAll("img")].map((i) => i.getAttribute("loading")).slice(0, 4)).toEqual(["eager", "eager", "eager", "lazy"]);

@@ -49,8 +49,9 @@ export const BRAND_IMAGE_SLIDES: readonly BrandImageSlide[] = [
  * Each fills the 2:1 frame with no zoom. 01 and 05-09 are exactly 2:1, so
  * nothing is cut; 10-12 were supplied at 1768 x 890, so about 1 px is
  * trimmed top and bottom on screen (accepted by the owner: only background).
- * 10-12 have buttons drawn on them but are deliberately not links: those
- * features (today's specials, food requests, tomorrow's menu) don't exist yet.
+ * 10 and 12 have buttons drawn on them but are deliberately not links: those
+ * features (today's specials, tomorrow's menu) don't exist yet. 11 (food
+ * requests) is left out of the list until that feature launches.
  * A seasonal image has a `window` of Singapore dates, both days included;
  * outside it the image is skipped.
  */
@@ -65,7 +66,7 @@ export interface HeroImage {
 export const HERO_IMAGES: readonly HeroImage[] = [
   { key: "01-browse", src: "/hero/01-browse.webp", alt: "Something good is cooking nearby. Order straight from the people who make it: home cooks, hawkers, bakers and small businesses. Browse all cooks and stalls.", linksToAllCooks: true },
   { key: "10-whats-cooking", src: "/hero/10-whats-cooking.webp", alt: "What's cooking today? Discover today's mystery specials from our home cooks and hawkers. Explore today's specials.", linksToAllCooks: false },
-  { key: "11-request-food", src: "/hero/11-request-food.webp", alt: "Request your favourite food! Craving something special? Tell us what you want and let our home cooks and hawkers make it happen. Request now.", linksToAllCooks: false },
+  // 11-request-food (public/hero/11-request-food.webp, kept) returns when Request Favourite Food launches (planned January 2027).
   { key: "12-tomorrows-menu", src: "/hero/12-tomorrows-menu.webp", alt: "Tomorrow's menu: pre-order today! See what our home cooks and hawkers will prepare tomorrow and reserve your portion now. Pre-order now.", linksToAllCooks: false },
   { key: "05-deepavali", src: "/hero/05-deepavali.webp", alt: "Deepavali special deals. Celebrate the Festival of Lights with delicious local food from home cooks, hawkers and small businesses.", linksToAllCooks: true, window: { from: "2026-10-28", to: "2026-11-09" } },
   { key: "06-christmas", src: "/hero/06-christmas.webp", alt: "Christmas special deals. Enjoy delicious local food from home cooks, hawkers and small businesses.", linksToAllCooks: true, window: { from: "2026-12-01", to: "2026-12-26" } },
