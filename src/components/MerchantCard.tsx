@@ -8,6 +8,7 @@ import { UNAVAILABLE_LABEL } from "@/lib/kitchen-availability";
 import type { DealBadgeKind } from "@/lib/deals";
 import { CategoryPill, RegisteredBadge, formatRatingSummary } from "./KitchenBadges";
 import { DealBadge } from "./DealBadge";
+import { RegionTag } from "./RegionTag";
 
 const FAV_KEY = "kb-favourites";
 // The card doesn't follow other cards' toggles; it re-reads storage when it renders.
@@ -41,7 +42,7 @@ export function MerchantCard({ merchant, variant = "grid", dealBadge = null }: {
       <div className="min-w-0 flex-1 py-1">
         <div className="flex items-start justify-between gap-2"><h3 className="truncate text-[15px] font-black text-slate-900">{merchant.name}</h3><button type="button" onClick={toggle} aria-label={fav ? "Remove favourite" : "Add favourite"} className={`kb-heart ${fav ? "is-fav" : ""}`}>{fav ? "♥" : "♡"}</button></div>
         <p className="mt-1 text-[11px] font-semibold text-slate-500">{merchant.cuisine} · {merchant.category === "home-cook" ? "Home Cook" : merchant.category === "hawker" ? "Hawker" : merchant.category === "bakery" ? "Bakery" : "Local Seller"}</p>
-        <div className="mt-2 flex flex-wrap items-center gap-2"><span className="text-[11px] font-black text-amber-500">★ {merchant.rating > 0 ? merchant.rating.toFixed(1) : "New"}</span><span className="text-[10px] text-slate-400">({merchant.ratingCount ?? 0})</span><span className="text-[10px] text-slate-500">◷ {merchant.etaMinutes}–{merchant.etaMinutes + 15} min</span>{merchant.cuisineType === "halal" && <span className="kb-halal-pill">Halal</span>}{deal && <DealBadge kitchenId={merchant.id} kind={deal} variant="list" />}{unavailableBadge}</div>
+        <div className="mt-2 flex flex-wrap items-center gap-2"><span className="text-[11px] font-black text-amber-500">★ {merchant.rating > 0 ? merchant.rating.toFixed(1) : "New"}</span><span className="text-[10px] text-slate-400">({merchant.ratingCount ?? 0})</span><span className="text-[10px] text-slate-500">◷ {merchant.etaMinutes}–{merchant.etaMinutes + 15} min</span><RegionTag region={merchant.region} />{merchant.cuisineType === "halal" && <span className="kb-halal-pill">Halal</span>}{deal && <DealBadge kitchenId={merchant.id} kind={deal} variant="list" />}{unavailableBadge}</div>
       </div>
     </Link>
   );
@@ -53,6 +54,6 @@ export function MerchantCard({ merchant, variant = "grid", dealBadge = null }: {
       <button type="button" onClick={toggle} aria-label={fav ? "Remove favourite" : "Add favourite"} className={`kb-card-heart ${fav ? "is-fav" : ""}`}>{fav ? "♥" : "♡"}</button>
       <div className="absolute inset-x-0 bottom-0 p-3.5"><div className="flex items-end justify-between gap-2"><div className="min-w-0"><h3 className="truncate text-[15px] font-extrabold text-white">{merchant.name}</h3><p className="mt-0.5 truncate text-xs text-white/80">{merchant.cuisine}{merchant.area?` · ${merchant.area}`:""}</p></div><span data-testid="rating-summary" className="kb-rating-pill"><span aria-hidden="true">★ {merchant.rating>0?merchant.rating.toFixed(1):"New"}</span><span className="sr-only">{formatRatingSummary(merchant.rating,merchant.ratingCount??0)}</span></span></div></div>
     </div>
-    <div className="p-3.5"><div className="flex items-center gap-1.5"><CategoryPill category={merchant.category}/>{merchant.businessUen&&<RegisteredBadge uen={merchant.businessUen}/>}</div><div className="mt-3 flex items-center justify-between text-xs text-slate-500"><span>◷ {merchant.etaMinutes}–{merchant.etaMinutes+15} min</span><span>From <b className="text-slate-900">${merchant.priceFrom.toFixed(2)}</b></span></div>{merchant.menuHighlights[0]?.name&&<p className="mt-2 truncate text-sm font-bold text-slate-800">Popular · {merchant.menuHighlights[0].name}</p>}</div>
+    <div className="p-3.5"><div className="flex items-center gap-1.5"><CategoryPill category={merchant.category}/><RegionTag region={merchant.region}/>{merchant.businessUen&&<RegisteredBadge uen={merchant.businessUen}/>}</div><div className="mt-3 flex items-center justify-between text-xs text-slate-500"><span>◷ {merchant.etaMinutes}–{merchant.etaMinutes+15} min</span><span>From <b className="text-slate-900">${merchant.priceFrom.toFixed(2)}</b></span></div>{merchant.menuHighlights[0]?.name&&<p className="mt-2 truncate text-sm font-bold text-slate-800">Popular · {merchant.menuHighlights[0].name}</p>}</div>
   </Link>;
 }

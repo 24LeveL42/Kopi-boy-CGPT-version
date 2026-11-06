@@ -13,7 +13,8 @@ const CACHE_TTL_MS = 10 * 60_000;
 export const NEARBY_FALLBACK_MS = 1_500;
 const POSTAL_KEY = "kb-delivery-postal-code";
 
-function readPostalCode(): string {
+/** The postal code remembered from checkout, or "" (also used by use-customer-region.ts). */
+export function readPostalCode(): string {
   try {
     const saved = localStorage.getItem(POSTAL_KEY) ?? "";
     return /^\d{6}$/.test(saved) ? saved : "";

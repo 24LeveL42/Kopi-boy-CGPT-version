@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatKitchenArea, loadKitchenLocations, loadOrderPaynow, roundCoordinate, selectKitchens } from "@/lib/kitchens";
+import { formatKitchenArea, loadKitchenLocations, loadKitchenRegions, loadOrderPaynow, roundCoordinate, selectKitchens, OPTIONAL_KITCHEN_COLUMNS, KITCHEN_COLUMNS } from "@/lib/kitchens";
 
 const missing = (col: string) => ({ data: null, error: { code: "42703", message: `column kitchens.${col} does not exist`, details: "", hint: "", name: "PostgrestError" } });
 
@@ -16,6 +16,13 @@ describe("selectKitchens — customer-readable kitchen columns", () => {
     const asked: string[] = [];
     await selectKitchens(async (columns) => (asked.push(columns), { data: [], error: null }));
     expect(asked[0]).not.toMatch(/paynow|latitude|longitude|acknowledged_terms_at/);
+  });
+
+  it("never asks for region: it is read on its own (loadKitchenRegions), so a missing grant can't fail the marketplace", async () => {
+    const asked: string[] = [];
+    await selectKitchens(async (columns) => (asked.push(columns), { data: [], error: null }));
+    expect(asked[0].split(", ")).not.toContain("region");
+    expect([...KITCHEN_COLUMNS, ...OPTIONAL_KITCHEN_COLUMNS]).not.toContain("region");
   });
 
   it("drops only the optional column that doesn't exist yet, and retries", async () => {
@@ -130,5 +137,37 @@ describe("loadOrderPaynow — only via get_order_paynow once it exists", () => {
     const { client, log } = fakeSupabase({ "rpc:get_order_paynow": fail("42501") });
     expect(await loadOrderPaynow(client, "o1", "k1")).toBeNull();
     expect(log).toHaveLength(1);
+  });
+});
+
+describe("loadKitchenRegions — a separate, never-fatal read of kitchens.region", () => {
+  it("asks only for id and region, and maps each kitchen to its region", async () => {
+    const { client, log } = fakeSupabase({ kitchens: ok([{ id: "k1", region: "east" }, { id: "k2", region: "south" }, { id: "k3", region: null }]) });
+    const map = await loadKitchenRegions(client, ["k1", "k2", "k3"]);
+    expect([...map]).toEqual([["k1", "east"], ["k2", "south"]]);
+    expect(log).toEqual(["kitchens: id, region"]);
+  });
+
+  it("drops values that aren't one of the four regions", async () => {
+    const { client } = fakeSupabase({ kitchens: ok([{ id: "k1", region: "central" }, { id: "k2", region: "East" }, { id: "k3", region: "west" }]) });
+    expect([...(await loadKitchenRegions(client, ["k1", "k2", "k3"]))]).toEqual([["k3", "west"]]);
+  });
+
+  it("gives no regions (never an error) when the column is missing or not granted", async () => {
+    for (const code of ["42703", "42501", "PGRST116"]) {
+      const { client } = fakeSupabase({ kitchens: fail(code) });
+      expect((await loadKitchenRegions(client, ["k1"])).size).toBe(0);
+    }
+  });
+
+  it("gives no regions when the client itself throws", async () => {
+    const throwing = { from: () => { throw new Error("network down"); } } as never;
+    expect((await loadKitchenRegions(throwing, ["k1"])).size).toBe(0);
+  });
+
+  it("doesn't query at all with no kitchens", async () => {
+    const { client, log } = fakeSupabase({});
+    expect((await loadKitchenRegions(client, [])).size).toBe(0);
+    expect(log).toEqual([]);
   });
 });

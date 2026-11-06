@@ -8,7 +8,9 @@
  * add a new file per feature so this stays a marketplace-only model.
  */
 
-export type MerchantCategory = "home-cook" | "hawker" | "bulk-orders" | "bakery" | "drinks";
+import type { RegionCode } from "./regions";
+
+export type MerchantCategory ="home-cook" | "hawker" | "bulk-orders" | "bakery" | "drinks";
 
 export type CuisineType = "chinese" | "halal" | "indian" | "western";
 
@@ -66,4 +68,6 @@ export interface Merchant {
   businessUen?: string | null;
   /** HQ has blocked this cook (kitchens.is_blocked) — shown as "Currently unavailable", no new orders. */
   isBlocked?: boolean;
+  /** North / South / East / West (kitchens.region, via loadKitchenRegions). Null when unknown or unreadable. */
+  region?: RegionCode | null;
 }

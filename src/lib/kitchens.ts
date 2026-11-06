@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Merchant } from "@/lib/types";
 import { sortAvailableFirst } from "@/lib/kitchen-availability";
 import { isNewKitchen } from "@/lib/new-kitchens";
+import { toRegion, type RegionCode } from "@/lib/regions";
 
 type ServerSupabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -111,6 +112,34 @@ export async function loadLiveSince(supabase: ServerSupabase, kitchenIds: string
   return new Map();
 }
 
+/**
+ * Each kitchen's region (North / South / East / West), from the public
+ * kitchens.region column. Read on its own, NOT through selectKitchens /
+ * OPTIONAL_KITCHEN_COLUMNS: that retry only skips a column that doesn't
+ * exist (42703), and a column that exists but isn't granted (42501) would
+ * fail the whole marketplace query. Here any error, or an unknown value,
+ * just means no region: the page never fails over it.
+ */
+export async function loadKitchenRegions(supabase: ServerSupabase, kitchenIds: string[]): Promise<Map<string, RegionCode>> {
+  const regions = new Map<string, RegionCode>();
+  if (kitchenIds.length === 0) return regions;
+  try {
+    const { data, error } = await supabase
+      .from("kitchens")
+      .select("id, region")
+      .in("id", kitchenIds)
+      .returns<{ id: string; region?: unknown }[]>();
+    if (error) return regions;
+    for (const k of data ?? []) {
+      const region = toRegion(k.region);
+      if (k.id && region) regions.set(k.id, region);
+    }
+  } catch {
+    // Network or client failure: no regions, same as an error.
+  }
+  return regions;
+}
+
 /** 2 decimals is about 1.1 km: enough for the 8 km "near you" check, too coarse to find a home. */
 export function roundCoordinate(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null;
@@ -187,13 +216,14 @@ export async function getLiveMerchants(): Promise<Merchant[]> {
   if (!kitchens || kitchens.length === 0) return [];
 
   const kitchenIds = kitchens.map((k) => k.id);
-  const [{ data: items, error: itemsError }, { data: summaries }, liveSince, locations] = await Promise.all([
+  const [{ data: items, error: itemsError }, { data: summaries }, liveSince, locations, regions] = await Promise.all([
     supabase.from("menu_items").select("*").in("kitchen_id", kitchenIds).order("created_at", { ascending: true }).returns<MenuItemRow[]>(),
     // Deliberately not fatal: before schema section 32 runs, the view doesn't
     // exist -> error -> no summaries, and the marketplace still loads.
     supabase.from("kitchen_rating_summary").select("kitchen_id, average, rating_count").in("kitchen_id", kitchenIds).returns<RatingSummaryRow[]>(),
     loadLiveSince(supabase, kitchenIds),
     loadKitchenLocations(supabase, kitchenIds),
+    loadKitchenRegions(supabase, kitchenIds),
   ]);
 
   if (itemsError) throw new Error(`Failed to load menu items: ${itemsError.message}`);
@@ -233,6 +263,7 @@ export async function getLiveMerchants(): Promise<Merchant[]> {
       menuPhoto: kitchenItems.find((i) => i.photo_url)?.photo_url ?? null,
       businessUen: k.business_uen ?? null,
       isBlocked: k.is_blocked === true,
+      region: regions.get(k.id) ?? null,
     };
   });
   return sortAvailableFirst(merchants);

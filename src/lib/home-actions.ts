@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { geocodePostalCode } from "@/lib/geocode";
 import { NEW_KITCHENS_RADIUS_KM } from "@/lib/new-kitchens";
 import { firstOrigin, kitchensWithin, type KitchenPoint, type LatLng, type ServerNearby } from "@/lib/home-location";
+import { toRegion, type RegionCode } from "@/lib/regions";
 
 const MAX_KITCHENS = 1000;
 const GEOCODE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -73,4 +74,45 @@ export async function findNearbyKitchenIds(postalCode: string, kitchens: Kitchen
   ] as const);
   if (!origin || source === "none") return none;
   return { source, nearbyIds: kitchensWithin(origin, cleanKitchens(kitchens), NEW_KITCHENS_RADIUS_KM) };
+}
+
+/**
+ * The customer's own region, for ordering the home page lists: the first two
+ * digits of a postal code the app already has, looked up in
+ * postal_sector_regions (public, Partner repo docs/supabase-regions.sql).
+ * The signed-in customer's default saved address comes first, then the
+ * postal code remembered from checkout. With neither the answer is null and
+ * there is no region ordering. No geocoding, and only the region code goes
+ * back to the browser. Any error is null too: display only.
+ */
+export async function findCustomerRegion(postalCode: string): Promise<RegionCode | null> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    let code: string | null = null;
+    if (user) {
+      const { data, error } = await supabase
+        .from("customer_addresses")
+        .select("postal_code")
+        .eq("user_id", user.id)
+        .eq("is_default", true)
+        .maybeSingle<{ postal_code: string | null }>();
+      if (!error && data?.postal_code && /^\d{6}$/.test(data.postal_code)) code = data.postal_code;
+    }
+    const remembered = String(postalCode ?? "").trim();
+    if (!code && /^\d{6}$/.test(remembered)) code = remembered;
+    if (!code) return null;
+
+    const { data, error } = await supabase
+      .from("postal_sector_regions")
+      .select("region")
+      .eq("sector", code.slice(0, 2))
+      .maybeSingle<{ region: string | null }>();
+    return error ? null : toRegion(data?.region);
+  } catch {
+    return null;
+  }
 }
