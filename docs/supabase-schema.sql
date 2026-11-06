@@ -7,6 +7,8 @@
 -- EXISTS, DROP POLICY/TRIGGER IF EXISTS before CREATE, CREATE OR REPLACE for
 -- functions, IF EXISTS/IF NOT EXISTS on ALTER statements). Running this whole
 -- file again on a database that already has some or all of it is safe.
+--
+-- Kitchen location, postal_sector and region are defined in the Partner repo (docs/supabase-schema.sql sections 28 and 29, and docs/supabase-regions.sql).
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------

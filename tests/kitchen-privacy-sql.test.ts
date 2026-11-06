@@ -8,6 +8,9 @@ import { attempt, id, rolledBack } from "./helpers/pricing-db";
  * docs/supabase-kitchen-privacy.sql, run for real (PGlite) on a kitchens
  * table with the live database's columns, the real kitchens / menu_items
  * read policies, and minimal stand-ins for what hero_candidates reads.
+ * Run twice: without kitchens.region (today's database) and with it (after
+ * the Partner repo's docs/supabase-regions.sql), where step 4b makes it the
+ * 16th public column.
  */
 
 const PRIVACY_SQL = readFileSync(new URL("../docs/supabase-kitchen-privacy.sql", import.meta.url), "utf8");
@@ -17,6 +20,8 @@ const PUBLIC_COLUMNS = [
   "created_at", "updated_at", "business_uen", "postal_sector", "is_halal", "is_blocked", "live_since",
 ];
 const HIDDEN_COLUMNS = ["paynow_type", "paynow_value", "latitude", "longitude", "acknowledged_terms_at"];
+/** Step 4b's column: public once docs/supabase-regions.sql (Partner repo) has added it. */
+const REGION = "region";
 
 const LIVE = id(1);
 const OFFLINE = id(2);
@@ -26,7 +31,7 @@ const ACCEPTED = id(601);
 const PLACED = id(602);
 const CANCELLED = id(603);
 
-const schema = (withPostalSector: boolean) => `
+const schema = (withPostalSector: boolean, withRegion: boolean) => `
 create role anon;
 create role authenticated;
 create schema auth;
@@ -52,6 +57,7 @@ create table public.kitchens (
   longitude numeric(9,6),
   business_uen text,
   ${withPostalSector ? "postal_sector text," : ""}
+  ${withRegion ? "region text," : ""}
   is_halal boolean default false,
   acknowledged_terms_at timestamptz,
   is_blocked boolean not null default false,
@@ -100,11 +106,12 @@ insert into public.orders (id, customer_id, kitchen_id, order_status) values
   ('${PLACED}', '${CUSTOMER}', '${LIVE}', 'placed'),
   ('${CANCELLED}', '${CUSTOMER}', '${LIVE}', 'cancelled');
 insert into public.active_deals values ('${id(900)}', '${LIVE}', 'flash', 'Kopi deal', now() + interval '1 hour');
+${withRegion ? `update public.kitchens set region = case when id = '${LIVE}' then 'east' else 'west' end;` : ""}
 `;
 
-async function freshDb(withPostalSector = true): Promise<PGlite> {
+async function freshDb(withPostalSector = true, withRegion = false): Promise<PGlite> {
   const db = new PGlite();
-  await db.exec(schema(withPostalSector));
+  await db.exec(schema(withPostalSector, withRegion));
   return db;
 }
 
@@ -117,11 +124,16 @@ async function as<T>(db: PGlite, role: "anon" | "authenticated", uid: string | n
   });
 }
 
-describe("docs/supabase-kitchen-privacy.sql", () => {
+describe.each([
+  { setup: "without kitchens.region (before docs/supabase-regions.sql)", withRegion: false },
+  { setup: "with kitchens.region (after docs/supabase-regions.sql)", withRegion: true },
+])("docs/supabase-kitchen-privacy.sql $setup", ({ withRegion }) => {
   let db: PGlite;
+  /** 15 columns, or 16 once kitchens.region exists (step 4b). */
+  const publicColumns = withRegion ? [...PUBLIC_COLUMNS, REGION] : PUBLIC_COLUMNS;
 
   beforeAll(async () => {
-    db = await freshDb();
+    db = await freshDb(true, withRegion);
     await db.exec(PRIVACY_SQL);
   });
   afterAll(async () => {
@@ -135,18 +147,26 @@ describe("docs/supabase-kitchen-privacy.sql", () => {
     }
   });
 
-  it("grants anon exactly the public column list", async () => {
+  it(`grants anon exactly the public column list (${withRegion ? 16 : 15} columns)`, async () => {
     const { rows } = await db.query<{ column_name: string }>(
       `select column_name from information_schema.column_privileges
        where table_schema = 'public' and table_name = 'kitchens' and grantee = 'anon' and privilege_type = 'SELECT'`
     );
-    expect(rows.map((r) => r.column_name).sort()).toEqual([...PUBLIC_COLUMNS].sort());
+    expect(rows).toHaveLength(withRegion ? 16 : 15);
+    expect(rows.map((r) => r.column_name).sort()).toEqual([...publicColumns].sort());
   });
 
   it("still lets signed-out visitors read the public columns of live kitchens only", async () => {
-    const { rows } = await as(db, "anon", null, () => db.query<{ id: string }>(`select ${PUBLIC_COLUMNS.join(", ")} from public.kitchens`));
+    const { rows } = await as(db, "anon", null, () => db.query<{ id: string }>(`select ${publicColumns.join(", ")} from public.kitchens`));
     expect(rows.map((r) => r.id)).toEqual([LIVE]);
   });
+
+  if (withRegion) {
+    it("lets signed-out visitors read region, the coarse label only", async () => {
+      const { rows } = await as(db, "anon", null, () => db.query<{ id: string; region: string }>("select id, region from public.kitchens"));
+      expect(rows).toEqual([{ id: LIVE, region: "east" }]);
+    });
+  }
 
   it("makes select * fail for signed-out visitors (why the app never uses it on kitchens)", async () => {
     const error = await as(db, "anon", null, () => attempt(db, "select * from public.kitchens"));
@@ -206,10 +226,33 @@ describe("docs/supabase-kitchen-privacy.sql", () => {
     });
   });
 
-  it("is safe to re-run", async () => {
+  it(`is safe to re-run${withRegion ? ", and a re-run keeps region readable" : ""}`, async () => {
     await db.exec(PRIVACY_SQL);
-    const error = await as(db, "anon", null, () => attempt(db, "select paynow_value from public.kitchens"));
+    for (const column of HIDDEN_COLUMNS) {
+      const error = await as(db, "anon", null, () => attempt(db, `select ${column} from public.kitchens`));
+      expect(error, column).toMatch(/permission denied/);
+    }
+    expect(await as(db, "anon", null, () => attempt(db, "select * from public.kitchens"))).toMatch(/permission denied/);
+    const { rows } = await as(db, "anon", null, () => db.query<{ id: string }>(`select ${publicColumns.join(", ")} from public.kitchens`));
+    expect(rows.map((r) => r.id)).toEqual([LIVE]);
+  });
+});
+
+describe("docs/supabase-kitchen-privacy.sql, then kitchens.region added (docs/supabase-regions.sql)", () => {
+  it("keeps a column added later hidden until granted, and a re-run of this file grants region", async () => {
+    const db = await freshDb(true, false);
+    await db.exec(PRIVACY_SQL);
+    // What supabase-regions.sql does to the table (its own grant aside).
+    await db.exec(`alter table public.kitchens add column region text; update public.kitchens set region = 'east';`);
+    const before = await as(db, "anon", null, () => attempt(db, "select region from public.kitchens"));
+    expect(before).toMatch(/permission denied/);
+
+    await db.exec(PRIVACY_SQL);
+    const { rows } = await as(db, "anon", null, () => db.query<{ region: string }>("select region from public.kitchens"));
+    expect(rows).toEqual([{ region: "east" }]);
+    const error = await as(db, "anon", null, () => attempt(db, "select latitude from public.kitchens"));
     expect(error).toMatch(/permission denied/);
+    await db.close();
   });
 });
 

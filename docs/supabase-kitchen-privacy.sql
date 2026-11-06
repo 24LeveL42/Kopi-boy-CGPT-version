@@ -20,6 +20,10 @@
 --        id, business_name, category, cuisine_type, neighbourhood,
 --        description, hero_image, is_live, created_at, updated_at,
 --        business_uen, postal_sector, is_halal, is_blocked, live_since
+--      plus region (16 columns in all) once the Partner repo's
+--      docs/supabase-regions.sql has added kitchens.region. Step 4b grants
+--      it only when the column exists, so this file runs before or after
+--      supabase-regions.sql, and a re-run never takes region away.
 --      Hidden from anon: paynow_type, paynow_value, latitude, longitude,
 --      acknowledged_terms_at (and any column added later, until granted).
 --
@@ -33,7 +37,9 @@
 -- as the inserting user.
 --
 -- RUN ORDER: only after the Customer app that stops reading these columns
--- from kitchens is deployed (commit "Kitchen privacy Phase 1").
+-- from kitchens is deployed (commit "Kitchen privacy Phase 1"). Either
+-- side of the Partner repo's docs/supabase-regions.sql: before it, anon
+-- gets the 15 columns; after it (or re-run after it), the 16.
 --
 -- FAILS SAFELY: everything below section 0 runs in one transaction, and the
 -- first step checks that every column it relies on exists. If one is
@@ -227,6 +233,24 @@ grant select (
   live_since
 ) on public.kitchens to anon;
 
+-- ----------------------------------------------------------------------------
+-- 4b. kitchens.region (Partner repo, docs/supabase-regions.sql) is the 16th
+-- public column: the coarse North / South / East / West label. Granted only
+-- when the column exists, so this file still runs on a database without it,
+-- and re-running this file after supabase-regions.sql never takes it away
+-- (step 4 above revokes every column first).
+-- ----------------------------------------------------------------------------
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'kitchens' and column_name = 'region'
+  ) then
+    grant select (region) on public.kitchens to anon;
+  end if;
+end;
+$$;
+
 commit;
 
 
@@ -237,6 +261,7 @@ commit;
 --   select paynow_value from public.kitchens limit 1;   -- permission denied
 --   select latitude from public.kitchens limit 1;       -- permission denied
 --   select id, business_name, postal_sector, is_blocked from public.kitchens limit 1;  -- works
+--   select id, region from public.kitchens limit 1;     -- works (once supabase-regions.sql has run)
 --   select count(*) from public.menu_items;             -- works
 --   select * from public.kitchen_public_locations limit 3;  -- 2-decimal values
 --   reset role;
