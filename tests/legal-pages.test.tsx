@@ -1,7 +1,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { CartProvider } from "@/lib/cart-context";
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -18,6 +18,7 @@ import PrivacyPage from "@/app/privacy/page";
 import AboutPage from "@/app/account/about/page";
 import HelpPage from "@/app/account/help/page";
 import { SiteFooter } from "@/components/SiteFooter";
+import { LoginForm } from "@/components/LoginForm";
 import { LEGAL_ENTITY_LINE, LEGAL_LINKS } from "@/lib/legal-links";
 
 const root = process.cwd();
@@ -104,5 +105,21 @@ describe("Site footer", () => {
 
   it("is in the root layout, so it shows on every page", () => {
     expect(readFileSync(path.join(root, "src/app/layout.tsx"), "utf8")).toContain("<SiteFooter />");
+  });
+});
+
+describe("Sign-in consent line", () => {
+  it("says the user agrees to the Terms of Use and Privacy Policy, linking both in the same tab", () => {
+    render(<LoginForm />);
+    fireEvent.click(screen.getByRole("button", { name: "Sign In" }));
+    const line = screen.getByText(/By continuing, you agree to our/);
+    expect(line).toHaveTextContent("By continuing, you agree to our Terms of Use and Privacy Policy.");
+    const terms = within(line).getByRole("link", { name: "Terms of Use" });
+    const privacy = within(line).getByRole("link", { name: "Privacy Policy" });
+    expect(terms).toHaveAttribute("href", "/terms");
+    expect(privacy).toHaveAttribute("href", "/privacy");
+    expect(terms).not.toHaveAttribute("target");
+    expect(privacy).not.toHaveAttribute("target");
+    expect(document.body).not.toHaveTextContent("for local food ordering and delivery");
   });
 });
