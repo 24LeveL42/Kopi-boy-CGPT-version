@@ -4,6 +4,7 @@ import { NotificationsProvider } from "@/lib/notifications-context";
 import { PageChrome } from "@/components/PageChrome";
 import { NotificationToasts } from "@/components/NotificationToasts";
 import { PushSync } from "@/components/PushNotifications";
+import { SiteFooter } from "@/components/SiteFooter";
 import "./globals.css";
 import { BRAND_NAME } from "@/lib/brand";
 
@@ -23,6 +24,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <NotificationToasts />
             <PushSync />
             {children}
+            <SiteFooter />
           </NotificationsProvider>
         </CartProvider>
       </body>
