@@ -34,7 +34,7 @@ Done:
 - Cart (`/cart`) — client-side, single-kitchen, `localStorage`-backed — and
   checkout, which creates a real `orders` row (`status = 'placed'`) plus its
   `order_items`, then lands on an order confirmation screen (`/orders/[id]`)
-- Auth: phone OTP (Vonage) + Google Sign-In, `/login`, `/account`
+- Auth: Google Sign-In, `/login`, `/account`
 - In-app notifications — bell + unread badge, live toast and `/notifications`
   inbox, driven by Supabase Realtime; the order page also updates live instead
   of polling (see `docs/notifications.md`; needs the last section of

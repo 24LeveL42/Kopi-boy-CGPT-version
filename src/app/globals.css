@@ -196,10 +196,6 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .kb-login-shell { min-height:calc(100vh - 62px); display:grid; place-items:center; padding:24px 16px 50px; background:radial-gradient(circle at 50% 0,rgba(123,63,228,.15),transparent 28rem),linear-gradient(180deg,#fbfaff,#f3f3f8); }
 .kb-login-card { width:min(100%,430px); border:1px solid #ebe8f1; border-radius:30px; background:#fff; padding:26px 22px; box-shadow:0 25px 70px rgba(31,25,56,.12); }
 .kb-google-button { display:flex; min-height:52px; align-items:center; justify-content:center; gap:10px; width:100%; border:1px solid #e2e0e8; border-radius:16px; background:#fff; color:#25232d; font-size:14px; font-weight:850; box-shadow:0 5px 14px rgba(20,18,40,.05); }
-.kb-phone-input { display:flex; align-items:center; gap:10px; min-height:52px; padding:0 15px; border:1px solid #e2e0e8; border-radius:16px; background:#fff; }
-.kb-phone-input span { color:#777482; font-size:14px; font-weight:800; }
-.kb-phone-input input { width:100%; border:0; outline:0; color:#171521; font-size:14px; font-weight:650; }
-.kb-code-input { width:100%; min-height:58px; border:1px solid #e2e0e8; border-radius:16px; outline:0; text-align:center; color:#171521; font-size:21px; font-weight:900; letter-spacing:.35em; }
 
 @media (min-width: 768px) {
   .kb-home-hero { border-radius:34px; }

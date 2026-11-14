@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useSyncExternalStore } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Spinner } from "./Spinner";
 import Image from "next/image";
@@ -9,19 +8,24 @@ import { BRAND_NAME } from "@/lib/brand";
 import Link from "next/link";
 import { LEGAL_LINKS } from "@/lib/legal-links";
 
-type Step="enter-phone"|"enter-code";
-const SG_PREFIX="+65";
-export function LoginForm(){
- const [welcome,setWelcome]=useState(true); const [step,setStep]=useState<Step>("enter-phone"); const [phone,setPhone]=useState(""); const [code,setCode]=useState(""); const [loading,startTransition]=useTransition(); const [error,setError]=useState<string|null>(null); const [googleLoading,setGoogleLoading]=useState(false); const supabase=createClient(); const router=useRouter(); const fullPhone=`${SG_PREFIX}${phone.replace(/\D/g,"")}`;
+export const AUTH_FAILED_MESSAGE="Sign-in didn't work, please try again.";
+export const IN_APP_BROWSER_TIP="Opened from Facebook or Instagram? Google sign-in may not work here. Tap ⋯ and choose Open in Chrome or Safari.";
+/** Facebook / Instagram / Messenger in-app browsers, where Google blocks sign-in. */
+export function isInAppBrowser(userAgent:string){return /FBAN|FBAV|FB_IAB|FBIOS|Instagram/i.test(userAgent)}
+/** The user agent never changes during a visit: nothing to subscribe to. */
+const noSubscribe=()=>()=>{};
+
+/** authFailed: /auth/callback sent us back with ?error=auth-failed. */
+export function LoginForm({authFailed=false}:{authFailed?:boolean}){
+ const [welcome,setWelcome]=useState(!authFailed); const [error,setError]=useState<string|null>(authFailed?AUTH_FAILED_MESSAGE:null); const [googleLoading,setGoogleLoading]=useState(false); const supabase=createClient();
+ // false on the server and during hydration, so both renders match; the real answer after.
+ const inAppBrowser=useSyncExternalStore(noSubscribe,()=>isInAppBrowser(navigator.userAgent),()=>false);
  async function handleGoogleSignIn(){if(googleLoading)return;setGoogleLoading(true);setError(null);const {error}=await supabase.auth.signInWithOAuth({provider:"google",options:{redirectTo:`${window.location.origin}/auth/callback`}});if(error){setError(error.message);setGoogleLoading(false)}}
- function handleSendCode(e:React.FormEvent){e.preventDefault();if(loading)return;setError(null);startTransition(async()=>{const {error}=await supabase.auth.signInWithOtp({phone:fullPhone});if(error){setError(error.message);return}setStep("enter-code")})}
- function handleVerifyCode(e:React.FormEvent){e.preventDefault();if(loading)return;setError(null);startTransition(async()=>{const {error}=await supabase.auth.verifyOtp({phone:fullPhone,token:code,type:"sms"});if(error){setError(error.message);return}router.push("/");router.refresh()})}
  if (welcome) return <div className="kb-welcome-screen"><div className="kb-welcome-photo"><Image src="/categories/home-cooks.jpg" alt="Local food" fill sizes="100vw" className="object-cover" priority/><div className="kb-welcome-shade"/><div className="relative z-10 flex min-h-screen flex-col justify-between p-7 text-white"><div className="pt-7"><Image src="/brand/logo-full.png" alt={BRAND_NAME} width={190} height={70} className="h-16 w-auto object-contain brightness-0 invert" priority/><h1 className="mt-8 text-4xl font-black leading-[1.03] tracking-tight">Local Food<br/>Local People<br/>Delivered to You</h1><p className="mt-4 max-w-[18rem] text-sm leading-6 text-white/80">Discover home cooks, hawkers and neighbourhood favourites.</p></div><div className="pb-4"><button onClick={()=>setWelcome(false)} className="kb-primary-button w-full">Get Started</button><button onClick={()=>setWelcome(false)} className="mt-3 w-full rounded-2xl border border-white/60 bg-black/35 py-4 text-sm font-black text-white backdrop-blur">Sign In</button></div></div></div></div>;
- return <div className="kb-login-shell"><div className="kb-login-card"><div className="text-center"><Image src="/brand/logo-full.png" alt={BRAND_NAME} width={150} height={56} className="mx-auto h-14 w-auto object-contain" priority/><p className="kb-eyebrow mt-5">WELCOME TO {BRAND_NAME.toUpperCase()}</p><h1 className="mt-2 text-3xl font-black tracking-tight">Local food.<br/>Local people.</h1><p className="mt-3 text-sm leading-6 text-slate-500">Sign in to order from home cooks, hawkers and neighbourhood food businesses.</p></div>
- <button onClick={handleGoogleSignIn} disabled={googleLoading||loading} className="kb-google-button mt-7">{googleLoading?<Spinner size={18}/>:<GoogleIcon/>}{googleLoading?"Redirecting…":"Continue with Google"}</button>
- <div className="my-5 flex items-center gap-3"><span className="h-px flex-1 bg-slate-200"/><span className="text-xs font-bold text-slate-400">OR</span><span className="h-px flex-1 bg-slate-200"/></div>
- {step==="enter-phone"?<form onSubmit={handleSendCode} className="space-y-3"><div className="kb-phone-input"><span>{SG_PREFIX}</span><input type="tel" inputMode="numeric" required value={phone} onChange={e=>setPhone(e.target.value.replace(/\D/g,"").slice(0,8))} placeholder="9123 4567"/></div><button type="submit" disabled={loading||googleLoading||phone.length<8} className="kb-primary-button w-full">{loading&&<Spinner/>}{loading?"Sending code…":"Continue with phone"}</button></form>:<form onSubmit={handleVerifyCode} className="space-y-3"><p className="text-sm text-slate-500">Enter the 6-digit code sent to <b className="text-slate-800">{fullPhone}</b>.</p><input type="text" inputMode="numeric" required value={code} onChange={e=>setCode(e.target.value)} placeholder="123456" className="kb-code-input"/><button type="submit" disabled={loading||googleLoading} className="kb-primary-button w-full">{loading&&<Spinner/>}{loading?"Verifying…":"Verify & continue"}</button><button type="button" onClick={()=>setStep("enter-phone")} className="w-full text-sm font-semibold text-slate-500">Use a different number</button></form>}
- {error&&<p className="mt-4 rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-600">{error}</p>}
+ return <div className="kb-login-shell"><div className="kb-login-card"><div className="text-center"><Image src="/brand/logo-full.png" alt={BRAND_NAME} width={150} height={56} className="mx-auto h-14 w-auto object-contain" priority/><p className="kb-eyebrow mt-5">WELCOME TO {BRAND_NAME.toUpperCase()}</p><h1 className="mt-2 text-3xl font-black tracking-tight">Local food.<br/>Local people.</h1><p className="mt-3 text-sm leading-6 text-slate-500">Sign in with your Google account to order from home cooks, hawkers and neighbourhood food businesses.</p></div>
+ <button onClick={handleGoogleSignIn} disabled={googleLoading} className="kb-google-button mt-7">{googleLoading?<Spinner size={18}/>:<GoogleIcon/>}{googleLoading?"Redirecting…":"Continue with Google"}</button>
+ {inAppBrowser&&<p role="note" className="mt-3 rounded-2xl bg-slate-50 p-3 text-xs font-semibold leading-5 text-slate-600">{IN_APP_BROWSER_TIP}</p>}
+ {error&&<p role="alert" className="mt-4 rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-600">{error}</p>}
  <p className="mt-6 text-center text-[11px] leading-5 text-slate-400">By continuing, you agree to our <LegalLink label="Terms of Use"/> and <LegalLink label="Privacy Policy"/>.</p>
  </div></div>;
 }
