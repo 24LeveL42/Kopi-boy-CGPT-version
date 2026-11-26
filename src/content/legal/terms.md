@@ -8,7 +8,7 @@ Kopi Boy is run by **KOPIE BOY** (UEN 53535194A), a sole proprietorship register
 
 Kopi Boy is a platform that connects customers with merchants and riders. **We are not the seller of the food and we do not cook, pack or deliver it.** When you order, you are buying from the merchant, not from us. Riders are independent people who choose to deliver; they are not our employees.
 
-During the pilot, Kopi Boy takes no commission on food sales. We do not collect or hold your payment. Customers pay the merchant directly, by PayNow, using the details shown at checkout. Any delivery fee shown in the app is only a suggested estimate; the final amount is agreed between the customer, the merchant and the rider. If a delivery fee applies, the customer pays it to the merchant as part of the order, and the merchant pays the rider. Kopi Boy takes no part of any delivery fee.
+During the pilot, Kopi Boy takes no commission on food sales. **We do not collect or hold your payment.** Customers pay the merchant directly, by PayNow, using the details shown at checkout. Any delivery fee shown in the app is only a suggested estimate; the final amount is agreed between the customer, the merchant and the rider. If a delivery fee applies, the customer pays it to the merchant as part of the order, and the merchant pays the rider. Kopi Boy takes no part of any delivery fee.
 
 ## 2. Accounts
 
