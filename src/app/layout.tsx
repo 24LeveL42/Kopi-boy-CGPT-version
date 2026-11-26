@@ -11,7 +11,7 @@ import { BRAND_NAME } from "@/lib/brand";
 export const metadata: Metadata = {
   title: `${BRAND_NAME} — From neighbourhoods to you`,
   description:
-    `${BRAND_NAME} connects home cooks, hawkers, and small food businesses with customers nearby — zero food-order commission.`,
+    `${BRAND_NAME} connects home cooks, hawkers, and small food businesses with customers nearby — free for merchants during our pilot.`,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

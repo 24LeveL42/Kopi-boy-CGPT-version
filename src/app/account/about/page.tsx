@@ -27,9 +27,9 @@ export default function AboutPage() {
             </p>
           </div>
           <div>
-            <p className="text-sm font-bold text-slate-900">0% commission</p>
+            <p className="text-sm font-bold text-slate-900">No fees for you</p>
             <p className="mt-1 text-xs leading-5 text-slate-500">
-              {BRAND_NAME} takes no commission on your food. You pay the kitchen directly by PayNow, and {BRAND_NAME} never holds your money.
+              {BRAND_NAME} charges you nothing. You pay the kitchen directly by PayNow, and {BRAND_NAME} never holds your money.
             </p>
           </div>
           <div>

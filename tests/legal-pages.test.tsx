@@ -47,7 +47,7 @@ describe.each([
     render(<Page />);
     expect(screen.getByRole("heading", { level: 1, name: title })).toBeInTheDocument();
     const article = screen.getByTestId(`legal-${doc}`);
-    expect(article).toHaveTextContent("Effective 22 December 2026");
+    expect(article).toHaveTextContent("Effective 26 November 2026");
     expect(article).toHaveTextContent("KOPIE BOY");
     expect(article).toHaveTextContent("UEN 53535194A");
   });

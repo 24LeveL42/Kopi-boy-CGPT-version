@@ -1,7 +1,8 @@
 # Kopi Boy 2.0
 
 Singapore food-delivery marketplace for home cooks, hawkers, and small food
-businesses — zero food-order commission. Full business model in
+businesses — free for merchants during the pilot (any future commission
+capped at 15% of food sales, with 30 days' notice). Full business model in
 [`/docs/feature-001.md`](./docs/feature-001.md).
 
 ## Stack

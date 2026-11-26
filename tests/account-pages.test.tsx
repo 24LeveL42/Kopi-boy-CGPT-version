@@ -46,13 +46,13 @@ describe("Profile", () => {
 });
 
 describe("Payment method", () => {
-  it("explains PayNow-to-the-kitchen, 0% commission and that nothing is stored", async () => {
+  it("explains PayNow-to-the-kitchen, no fees for you and that nothing is stored", async () => {
     inApp(await PaymentMethodPage());
     const page = document.body;
     expect(page).toHaveTextContent("The cook accepts");
     expect(page).toHaveTextContent("Send your proof of payment");
     expect(page).toHaveTextContent("never holds your money");
-    expect(page).toHaveTextContent("0% commission");
+    expect(page).toHaveTextContent("No fees for you");
     expect(page).toHaveTextContent("No cards or bank details stored");
   });
 
@@ -70,10 +70,10 @@ describe("Payment method", () => {
 });
 
 describe("About", () => {
-  it("describes Kopi Boy as a connector with 0% commission and riders paid by the kitchen", () => {
+  it("describes Kopi Boy as a connector with no fees for you and riders paid by the kitchen", () => {
     inApp(<AboutPage />);
     expect(document.body).toHaveTextContent("connects home cooks, hawkers and small food businesses");
-    expect(document.body).toHaveTextContent("0% commission");
+    expect(document.body).toHaveTextContent("No fees for you");
     expect(document.body).toHaveTextContent("The kitchen pays the rider the delivery fee directly.");
   });
 });

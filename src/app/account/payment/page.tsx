@@ -50,8 +50,8 @@ export default async function PaymentMethodPage() {
         <div className="kb-no-fee mt-4">
           <span>🏷️</span>
           <div>
-            <b>0% commission</b>
-            <small>Kopi Boy never holds your money. Your payment goes straight to the kitchen, and Kopi Boy takes no commission on your food.</small>
+            <b>No fees for you</b>
+            <small>Kopi Boy never holds your money. Your payment goes straight to the kitchen, and Kopi Boy charges you nothing.</small>
           </div>
         </div>
 

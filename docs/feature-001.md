@@ -11,8 +11,10 @@ features (see README build sequence).
 (Full detail is in the Product Owner's handover doc — summarized here so
 later features don't have to re-derive it.)
 
-- Zero food-order commission; merchant revenue is a flat monthly
-  subscription, TBD amount.
+- Free for merchants during the pilot: no subscription, registration or
+  setup fee. A commission may be introduced later: 15% of food sales after
+  discounts, delivery fee excluded, never higher, after at least 30 days'
+  written notice. Merchants can leave at any time.
 - Riders: free registration, no fees, approved by Kopi Boy before accepting
   deliveries, cook selects the rider (not auto-dispatch).
 - Customer does not pay at order placement — cook must accept first, then
