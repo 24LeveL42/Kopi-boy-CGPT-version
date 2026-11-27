@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { quoteDeliveryForPostalCode } from "@/lib/delivery-quote";
-import { deliveryQuoteMessage, isDeliveryType, type DeliveryType } from "@/lib/delivery-types";
+import { DELIVERY_FEE_UNAVAILABLE_MESSAGE, deliveryQuoteMessage, isDeliveryType, type DeliveryType } from "@/lib/delivery-types";
 import { getKitchenOrderStatus } from "@/lib/kitchens";
 import { UNAVAILABLE_ORDER_MESSAGE } from "@/lib/kitchen-availability";
 import { canAddAddress, isAddressId, validateAddressDetails, validateAddressInput } from "@/lib/addresses";
@@ -227,7 +227,8 @@ export async function placeOrder(
   }
 
   const quote = await quoteDeliveryForPostalCode(supabase, kitchenId, postalCode, delivery.deliveryType);
-  if (!quote.ok) return { ok: false, message: deliveryQuoteMessage(quote.reason) };
+  // Never place an order on a guessed fee: no quote, no order.
+  if (!quote.ok) return { ok: false, message: quote.reason === "unavailable" ? DELIVERY_FEE_UNAVAILABLE_MESSAGE : deliveryQuoteMessage(quote.reason) };
 
   const snapshot = savedAddress
     ? { delivery_address_line: savedAddress.address_line, delivery_unit: savedAddress.unit, delivery_notes: savedAddress.notes }

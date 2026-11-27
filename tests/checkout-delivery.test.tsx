@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { CartProvider } from "@/lib/cart-context";
 import { CartView } from "@/components/CartView";
 import { quoteDelivery } from "@/lib/delivery-actions";
@@ -96,13 +96,43 @@ describe("Checkout — postal-code delivery fee", () => {
     expect(screen.getByRole("button", { name: /Confirm Order/ })).toBeDisabled();
   });
 
-  it("says when postal code lookup is unavailable", async () => {
-    vi.mocked(quoteDelivery).mockResolvedValue({ ok: false, reason: "unavailable" });
+  it.each(["unavailable", "error"] as const)(
+    "when the fee can't be worked out (%s): says so, keeps Confirm Order disabled and places no order",
+    async (reason) => {
+      vi.mocked(quoteDelivery).mockResolvedValue({ ok: false, reason });
+      renderCheckout({ postalCode: "310123" });
+
+      const alert = await screen.findByTestId("delivery-fee-unavailable");
+      expect(alert).toHaveTextContent("We couldn't work out the delivery fee right now. Please try again in a minute.");
+      expect(screen.queryByText(/Postal code lookup is temporarily unavailable/)).not.toBeInTheDocument();
+      const confirm = screen.getByRole("button", { name: /Confirm Order/ });
+      expect(confirm).toBeDisabled();
+      expect(confirm).toHaveTextContent("$2.00"); // food only: no guessed fee in the total
+      expect(screen.queryByText("Delivery Fee")).not.toBeInTheDocument();
+      fireEvent.click(confirm);
+      expect(placeOrder).not.toHaveBeenCalled();
+    }
+  );
+
+  it("Try again re-quotes, and the order can go ahead once the fee is back", async () => {
+    vi.mocked(quoteDelivery).mockResolvedValueOnce({ ok: false, reason: "unavailable" });
+    renderCheckout({ postalCode: "310123" });
+    const alert = await screen.findByTestId("delivery-fee-unavailable");
+
+    fireEvent.click(within(alert).getByRole("button", { name: "Try again" }));
+
+    expect(await screen.findByTestId("delivery-fee-estimate")).toHaveTextContent("Estimated delivery fee S$3.30");
+    expect(screen.queryByTestId("delivery-fee-unavailable")).not.toBeInTheDocument();
+    expect(quoteDelivery).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("button", { name: /Confirm Order/ })).toBeEnabled();
+  });
+
+  it("not_found stays an address problem, not a 'try again'", async () => {
+    vi.mocked(quoteDelivery).mockResolvedValue({ ok: false, reason: "not_found" });
     renderCheckout({ postalCode: "310123" });
 
-    expect(
-      await screen.findByText("Postal code lookup is temporarily unavailable. Please try again in a minute.")
-    ).toBeInTheDocument();
+    expect(await screen.findByText("We couldn't find that postal code. Please check it.")).toBeInTheDocument();
+    expect(screen.queryByTestId("delivery-fee-unavailable")).not.toBeInTheDocument();
   });
 
   it("doesn't re-quote or change the fee when the item count changes", async () => {

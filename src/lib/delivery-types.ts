@@ -30,6 +30,18 @@ export function isDeliveryType(value: unknown): value is DeliveryType {
   return value === "normal" || value === "express";
 }
 
+/**
+ * Checkout, when the fee can't be worked out right now (OneMap down or its
+ * token refused, or the quote itself failed). No order is placed until it can.
+ */
+export const DELIVERY_FEE_UNAVAILABLE_MESSAGE =
+  "We couldn't work out the delivery fee right now. Please try again in a minute.";
+
+/** Failures worth a "Try again": nothing is wrong with the address itself. */
+export function isTransientQuoteFailure(reason: DeliveryQuoteFailure): boolean {
+  return reason === "unavailable" || reason === "error";
+}
+
 export function deliveryQuoteMessage(reason: DeliveryQuoteFailure): string {
   switch (reason) {
     case "signed_out":

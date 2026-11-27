@@ -208,7 +208,7 @@ describe("placeOrder — server-side delivery fee", () => {
     vi.mocked(geocodePostalCode).mockResolvedValue({ ok: false, reason: "unavailable" });
     const result = await placeOrder("kitchen-1", [{ menuItemId: "m1", quantity: 1 }], { postalCode: "310123", deliveryType: "normal" });
 
-    expect(result).toEqual({ ok: false, message: expect.stringMatching(/^Postal code lookup is temporarily unavailable\./) });
+    expect(result).toEqual({ ok: false, message: "We couldn't work out the delivery fee right now. Please try again in a minute." });
     expect(supabase.inserts).toEqual([]);
   });
 
